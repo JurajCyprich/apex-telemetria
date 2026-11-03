@@ -7,10 +7,12 @@ SPUSTENIE
    - Windows môže ukázať „Windows ochránil váš počítač“ (aplikácia nie je podpísaná):
      klikni „Ďalšie informácie“ → „Spustiť aj tak“.
    - Keď sa Windows Firewall opýta, POVOĽ prístup pre súkromné siete – inak sa mobil nepripojí.
-3. Otvorí sa prehliadač s dashboardom (http://localhost:8777). Čierne okno nechaj otvorené,
-   zatvorením sa aplikácia vypne.
+3. Otvorí sa okno aplikácie s dashboardom. Zatvorením okna sa aplikácia vypne.
+   Celá obrazovka: tlačidlo ⛶ alebo kláves F (späť Esc).
 
-Kolá a nastavenia sa ukladajú do priečinka „data“ vedľa .exe.
+Kolá a nastavenia sa ukladajú do priečinka „data“ vedľa .exe. Ak niečo nefunguje,
+pozri data\apex.log.
+Kto chce radšej prehliadač: spusti ApexTelemetria.exe --browser.
 
 NASTAVENIE HIER
 - Assetto Corsa, ACC, RaceRoom: netreba nič.

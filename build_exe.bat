@@ -12,7 +12,7 @@ set PY=.venv\Scripts\python.exe
 set OUT=dist\ApexTelemetria
 
 echo Pripravujem PyInstaller...
-"%PY%" -m pip install -q --disable-pip-version-check -r requirements.txt pyinstaller
+"%PY%" -m pip install -q --disable-pip-version-check -r requirements.txt pyinstaller pywebview
 if errorlevel 1 goto fail
 
 set EXTRA=
@@ -20,7 +20,7 @@ set EXTRA=
 if not defined EXTRA echo Upozornenie: vgamepad nie je nainštalovaný - volant v .exe nebude fungovať (spusti volant_setup.bat).
 
 echo Zostavujem ApexTelemetria.exe (trvá to asi minútu)...
-"%PY%" -m PyInstaller --noconfirm --clean --onefile --console --name ApexTelemetria ^
+"%PY%" -m PyInstaller --noconfirm --clean --onefile --windowed --name ApexTelemetria ^
     --icon "%CD%\web\icon.ico" --add-data "%CD%\web;web" %EXTRA% ^
     --distpath build\pyi --workpath build\work --specpath build apex.py
 if errorlevel 1 goto fail

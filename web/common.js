@@ -83,6 +83,7 @@ function setupFullscreen(btn) {
   const standalone = matchMedia("(display-mode: fullscreen), (display-mode: standalone)").matches
     || navigator.standalone;
   let wakeLock = null;
+  let desktopFs = false;
 
   async function lockScreen(on) {
     try {
@@ -96,6 +97,12 @@ function setupFullscreen(btn) {
   }
 
   function toggle() {
+    // desktopová aplikácia: celá obrazovka pre celé okno (HTML fullscreen by vyplnil len okno)
+    if (window.pywebview?.api?.toggle_fullscreen) {
+      desktopFs = !desktopFs;
+      window.pywebview.api.toggle_fullscreen();
+      return sync();
+    }
     if (current()) return exit.call(document);
     if (!request) {
       // iPhone Safari nepodporuje celú obrazovku – jediná cesta je ikona na ploche
@@ -107,7 +114,7 @@ function setupFullscreen(btn) {
   }
 
   function sync() {
-    const on = !!current();
+    const on = !!current() || desktopFs;
     document.body.classList.toggle("is-fullscreen", on);
     btn.textContent = "compact" in btn.dataset ? (on ? "✕" : "⛶") : (on ? "✕ Zmenšiť" : "⛶ Celá obrazovka");
     btn.title = on ? "Ukončiť celú obrazovku (F / Esc)" : "Celá obrazovka (F)";
@@ -122,6 +129,7 @@ function setupFullscreen(btn) {
     if (document.visibilityState === "visible") lockScreen(!!current() || standalone);
   });
   document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && desktopFs) return toggle();
     if ((e.key === "f" || e.key === "F") && !e.ctrlKey && !e.altKey && !e.metaKey
         && !e.target.closest("input, textarea, select, [contenteditable]")) toggle();
   });

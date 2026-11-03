@@ -5,7 +5,8 @@ Bezplatná telemetria pre sim racing + virtuálny button box a volant na mobile.
 ## Stiahnutie (bez Pythonu)
 
 Stiahni **`ApexTelemetria.zip`** z [Releases](https://github.com/JurajCyprich/apex-telemetria/releases/latest),
-rozbaľ ho a spusti `ApexTelemetria.exe`. Postup je v `NAVOD.txt` v ZIP-e.
+rozbaľ ho a spusti `ApexTelemetria.exe` – otvorí sa ako samostatná aplikácia vo vlastnom okne
+(bez prehliadača; mobil sa pripája cez QR kód ako predtým). Postup je v `NAVOD.txt` v ZIP-e.
 
 Windows môže ukázať „Windows ochránil váš počítač“ (aplikácia nie je podpísaná) –
 klikni **Ďalšie informácie → Spustiť aj tak**.
@@ -104,6 +105,7 @@ Parametre: `start.bat --port 9000` (iný port), `start.bat --no-browser`.
 
 ## Zostavenie .exe
 
-`build_exe.bat` zabalí aplikáciu cez PyInstaller do jedného `ApexTelemetria.exe` a pripraví
+`build_exe.bat` zabalí aplikáciu cez PyInstaller do jedného `ApexTelemetria.exe` (vlastné okno cez
+pywebview / WebView2, bez konzoly; `--browser` = režim v prehliadači) a pripraví
 `dist\ApexTelemetria.zip` (exe + `NAVOD.txt` + inštalátor ovládača ViGEmBus pre volant).
 Pre volant musí byť predtým nainštalovaný `vgamepad` (`volant_setup.bat`).

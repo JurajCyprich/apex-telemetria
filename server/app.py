@@ -292,7 +292,7 @@ class TelemetryApp:
         return app
 
 
-async def serve(port=None, open_browser=True):
+async def serve(port=None, open_browser=True, on_ready=None):
     tapp = TelemetryApp()
     if port:
         tapp.settings["http_port"] = port
@@ -319,6 +319,8 @@ async def serve(port=None, open_browser=True):
         if tapp.https_port:
             print(f"  Volant (mobil):     https://{ip}:{tapp.https_port}/wheel")
     print("  Ukončenie: Ctrl+C\n", flush=True)
+    if on_ready:
+        on_ready(port)
     if open_browser:
         import webbrowser
         webbrowser.open(f"http://localhost:{port}")
@@ -327,4 +329,7 @@ async def serve(port=None, open_browser=True):
     finally:
         pad_task.cancel()
         tapp.pad.neutral()
+        for task in tapp.tasks.values():
+            task.cancel()
+        await asyncio.gather(*tapp.tasks.values(), return_exceptions=True)
         await runner.cleanup()
