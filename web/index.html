@@ -162,6 +162,13 @@
     <p class="muted">Počas jazdy hlási časy kôl, palivo, vlajky a zabudnutý pit limiter. Hovorí, kým je otvorený tento dashboard.</p>
     <label class="check"><input type="checkbox" id="engOn"> <b>Zapnutý</b></label>
     <div class="field"><label>Hlas</label><select id="engVoice"></select></div>
+    <div class="field"><label>Jazyk hlásení <span class="muted" id="engLangInfo"></span></label>
+      <select id="engLang">
+        <option value="auto">Automaticky podľa hlasu</option>
+        <option value="sk">Slovenčina</option>
+        <option value="en">English</option>
+      </select>
+    </div>
     <p class="warn small" id="engNoLocal" hidden>Slovenský ani český hlas nie je nainštalovaný – hlásenia budú znieť cudzím prízvukom.
       Pridáš ho vo Windows: Nastavenia → Čas a jazyk → Reč → Spravovať hlasy → Pridať hlasy → Slovenčina. Potom reštartuj aplikáciu.</p>
     <div class="cols">
