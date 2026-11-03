@@ -183,9 +183,29 @@ setInterval(() => { if (last.connected) drawMap(); }, 100);
 drawMap();
 render();
 
-connectWS(onFrame, (msg) => {
-  if (msg.type === "lap") toast(`Kolo ${msg.data.lap} uložené: ${fmtTime(msg.data.time)}`);
+connectWS((d) => { onFrame(d); engineer.frame(d); }, (msg) => {
+  if (msg.type === "lap") {
+    toast(`Kolo ${msg.data.lap} uložené: ${fmtTime(msg.data.time)}`);
+    engineer.lap(msg.data);
+  }
 });
+engineer.setupUI();
+
+// ---------- nová verzia na GitHube ----------
+getJSON("/api/update").then((u) => {
+  $("version").textContent = `Verzia ${u.current}`;
+  let dismissed = "";
+  try { dismissed = localStorage.getItem("updateDismissed") || ""; } catch { /* nevadí */ }
+  if (!u.update || dismissed === u.latest) return;
+  $("updVer").textContent = u.latest;
+  $("updCur").textContent = u.current;
+  $("updLink").href = u.url;
+  $("update").hidden = false;
+  $("updClose").onclick = () => {
+    $("update").hidden = true;
+    try { localStorage.setItem("updateDismissed", u.latest); } catch { /* nevadí */ }
+  };
+}).catch(() => {});
 
 // ---------- modály ----------
 document.querySelectorAll("[data-close]").forEach((b) =>

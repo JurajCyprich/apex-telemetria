@@ -8,7 +8,7 @@ import time
 import segno
 from aiohttp import WSMsgType, web
 
-from . import certs, keys
+from . import certs, keys, updates
 from .gamepad import VirtualPad
 from .config import (DATA, WEB, load_buttonbox, load_settings, save_buttonbox,
                      save_settings)
@@ -63,6 +63,9 @@ class TelemetryApp:
         self.events = []
         self.held = {}  # ws -> {button_id: combo}
         self.pad = VirtualPad()
+        self.last_rumble = {}  # ws -> (large, small)
+        loop = asyncio.get_running_loop()
+        self.pad.on_rumble = lambda ws, large, small: loop.call_soon_threadsafe(self._rumble, ws, large, small)
         self.https_port = None
 
     # ---------- zdroje telemetrie ----------
@@ -164,9 +167,16 @@ class TelemetryApp:
         finally:
             self.clients.discard(ws)
             self.pad.neutral(ws)  # odpojený volant -> pustiť plyn
+            self.last_rumble.pop(ws, None)
             for combo in self.held.pop(ws, {}).values():
                 keys.key_up(combo)  # pustí klávesy držané odpojeným mobilom
         return ws
+
+    def _rumble(self, ws, large, small):
+        """Vibrácie z hry -> mobil, ktorý práve ovláda volant."""
+        if ws in self.clients and self.last_rumble.get(ws) != (large, small):  # ovládač hlási aj opakovane to isté
+            self.last_rumble[ws] = (large, small)
+            asyncio.ensure_future(self._send(ws, json.dumps({"type": "rumble", "l": large, "s": small})))
 
     def _button(self, profile_id, button_id):
         prof = self.buttonbox["profiles"].get(profile_id) or {}
@@ -201,6 +211,9 @@ class TelemetryApp:
                                   "wheel_qr": qr(wheel), "pad": self.pad.status(),
                                   "local": is_local(request),
                                   "sources": {sid: c.name for sid, c in SOURCES.items()}})
+
+    async def api_update(self, request):
+        return web.json_response(await updates.check())
 
     async def api_settings(self, request):
         return web.json_response(self.settings)
@@ -280,6 +293,7 @@ class TelemetryApp:
         r.add_get("/wheel", self.page("wheel.html"))
         r.add_get("/ws", self.ws_handler)
         r.add_get("/api/info", self.api_info)
+        r.add_get("/api/update", self.api_update)
         r.add_get("/api/settings", self.api_settings)
         r.add_post("/api/settings", self.api_settings_save)
         r.add_get("/api/buttonbox", self.api_buttonbox)

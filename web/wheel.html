@@ -105,6 +105,12 @@
     <div class="field"><label>Citlivosť pedálov (krivka): <b id="vCurve"></b></label>
       <input type="range" id="sCurve" min="0.5" max="2.5" step="0.1"></div>
     <label class="check"><input type="checkbox" id="sVibrate"> Vibrovať pri radení (shift)</label>
+    <div id="rumbleBox">
+      <label class="check"><input type="checkbox" id="sRumble"> Vibrácie z hry (obrubníky, šmyk, nárazy)</label>
+      <div class="field"><label>Sila vibrácií z hry: <b id="vRumbleGain"></b> %</label>
+        <input type="range" id="sRumbleGain" min="20" max="200" step="10"></div>
+    </div>
+    <p class="muted small" id="noRumble" hidden>Vibrácie z hry: tento mobil (prehliadač) vibrovanie nepodporuje – iPhone ho stránkam nepovoľuje.</p>
     <p class="muted small">V hre nastav ovládanie na <b>Xbox ovládač</b>: zatáčanie = ľavá páčka, plyn = RT, brzda = LT,
       radenie = RB / LB. Tlačidlá A B X Y ☰ ⧉ si v hre priraď podľa seba.</p>
     <div class="actions"><button class="btn primary" data-close>Hotovo</button></div>

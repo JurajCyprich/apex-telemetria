@@ -1,7 +1,7 @@
 // Volant na mobile: náklon mobilu = zatáčanie, posuvníky = plyn/brzda, posiela sa ako Xbox ovládač.
 const $ = (id) => document.getElementById(id);
 const STYLES = { f1: "F1 – LED svetlá", gt: "GT – pruh otáčok", analog: "Analógový otáčkomer", minimal: "Minimal" };
-const DEFAULTS = { style: "f1", curve: 1, vibrate: true };
+const DEFAULTS = { style: "f1", curve: 1, vibrate: true, rumble: true, rumbleGain: 100 };
 // nastavenia zatáčania – každá hra má vlastný profil, prepína sa podľa telemetrie
 const STEER_DEFAULTS = { range: 90, dead: 1, anti: 0, lin: 1, smooth: 40, invert: false };
 const GENERIC = "Všeobecný";
@@ -94,6 +94,8 @@ function releaseAll() {
   pedals.forEach((f) => f());
   buttonResets.forEach((f) => f());
   input.btn.clear();
+  rumbleLevel = 0;
+  navigator.vibrate?.(0);
 }
 
 // ---------- natočenie mobilu ----------
@@ -353,11 +355,29 @@ ws = connectWS((d) => {
     ? [d.game, d.car].filter(Boolean).join(" · ") : "Čakám na hru…";
   render();
 }, (msg) => {
-  if (msg.type !== "pad_status") return;
-  padErr.hidden = !msg.error;
-  padErr.textContent = msg.error ? `⚠ ${msg.error} (ťukni pre skrytie)` : "";
+  if (msg.type === "rumble") {
+    setRumble(msg.l, msg.s);
+  } else if (msg.type === "pad_status") {
+    padErr.hidden = !msg.error;
+    padErr.textContent = msg.error ? `⚠ ${msg.error} (ťukni pre skrytie)` : "";
+  }
 });
 padErr.addEventListener("click", () => { padErr.hidden = true; });
+
+// ---------- vibrácie z hry (hra rozvibruje Xbox ovládač -> zavibruje mobil) ----------
+// Mobil nevie meniť silu vibrácie, len jej dĺžku: silu prevedieme na dĺžku pulzu v každých 100 ms.
+const canVibrate = typeof navigator.vibrate === "function";
+let rumbleLevel = 0;
+function setRumble(large, small) {
+  // veľký motor = hrubé otrasy (obrubníky, náraz), malý = jemné (šmyk, ABS) – malý berieme slabšie
+  const level = Math.max(large, small * 0.7) / 255;
+  rumbleLevel = cfg.rumble ? Math.min(1, level * cfg.rumbleGain / 100) : 0;
+  if (rumbleLevel < 0.03 && canVibrate) navigator.vibrate(0);
+}
+setInterval(() => {
+  if (!canVibrate || !running || document.visibilityState !== "visible" || rumbleLevel < 0.03) return;
+  navigator.vibrate(Math.round(12 + 88 * rumbleLevel));
+}, 100);
 
 // ---------- štart, celá obrazovka, nastavenia ----------
 const fs = setupFullscreen($("fs"));
@@ -397,7 +417,7 @@ const GAME_TIPS = [
 const GENERIC_TIP = "V hre vypni mŕtvu zónu, filter a citlivosť riadenia podľa rýchlosti – inak sa sčítajú s týmto nastavením.";
 
 const steerFields = { sRange: "range", sDead: "dead", sAnti: "anti", sLin: "lin", sSmooth: "smooth" };
-const globalFields = { sStyle: "style", sCurve: "curve" };
+const globalFields = { sStyle: "style", sCurve: "curve", sRumbleGain: "rumbleGain" };
 
 function showValues() {
   $("vRange").textContent = sp.range;
@@ -406,6 +426,7 @@ function showValues() {
   $("vLin").textContent = Number(sp.lin).toFixed(1);
   $("vSmooth").textContent = sp.smooth;
   $("vCurve").textContent = Number(cfg.curve).toFixed(1);
+  $("vRumbleGain").textContent = cfg.rumbleGain;
 }
 
 function fillSettings() {
@@ -416,6 +437,9 @@ function fillSettings() {
   for (const [id, key] of Object.entries(globalFields)) $(id).value = cfg[key];
   $("sInvert").checked = sp.invert;
   $("sVibrate").checked = cfg.vibrate;
+  $("sRumble").checked = cfg.rumble;
+  $("rumbleBox").hidden = !canVibrate;
+  $("noRumble").hidden = canVibrate;
   showValues();
   drawCurve();
 }
@@ -464,6 +488,11 @@ for (const [id, key] of Object.entries(globalFields)) {
 }
 $("sInvert").addEventListener("change", (e) => { sp.invert = e.target.checked; steerFilter.reset(); saveCfg(); });
 $("sVibrate").addEventListener("change", (e) => { cfg.vibrate = e.target.checked; saveCfg(); });
+$("sRumble").addEventListener("change", (e) => {
+  cfg.rumble = e.target.checked;
+  saveCfg();
+  if (!cfg.rumble) setRumble(0, 0);
+});
 $("resetProf").addEventListener("click", () => {
   sp = { ...STEER_DEFAULTS };
   saveCfg();

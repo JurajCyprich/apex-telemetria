@@ -87,3 +87,15 @@
 .help summary { cursor: pointer; color: var(--text); }
 .help li { margin: 6px 0; }
 .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+
+/* nová verzia */
+.update { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 10px 16px 0; padding: 8px 14px;
+  border-radius: 10px; background: #30d1581a; border: 1px solid #30d15866; }
+.update[hidden] { display: none; }
+.update #updClose { margin-left: auto; }
+a.btn { text-decoration: none; display: inline-block; }
+
+/* hlasový inžinier */
+#engBtn.on { border-color: var(--green); color: var(--green); }
+.check { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
+.modal input[type=range] { width: 100%; }

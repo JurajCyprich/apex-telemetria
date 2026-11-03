@@ -45,6 +45,11 @@ Bez hry si to môžeš vyskúšať: **⚙ Nastavenia → Demo (simulácia bez hr
 - **Celá obrazovka** – tlačidlo ⛶ (alebo kláves **F**) na každej stránke. Kým je zapnutá, displej
   mobilu/tabletu nezhasne. Na **iPhone** to prehliadač nevie – daj v Safari *Zdieľať → Pridať na plochu*
   a otvor aplikáciu z ikony na ploche, pobeží bez lišty prehliadača.
+- **Hlasový inžinier** (🔈 Inžinier na dashboarde) – hlási čas kola a rozdiel oproti najlepšiemu,
+  palivo (menej ako 3 kolá), vlajky a zabudnutý pit limiter. Hovorí hlasom Windows – slovenským
+  (*Microsoft Filip*), ak je nainštalovaný: Nastavenia → Čas a jazyk → Reč → Pridať hlasy → Slovenčina.
+- **Kontrola aktualizácií** – pri štarte sa pozrie na GitHub; keď je nová verzia, dashboard ukáže
+  pruh s odkazom na stiahnutie.
 
 ## Button box – nastavenie
 
@@ -86,6 +91,9 @@ hry** (keď hra nereaguje na malé natočenie) a smer. Pri každej hre je aj tip
 nastaveniach ovládača (mŕtvu zónu, filter, citlivosť podľa rýchlosti), aby sa úpravy nesčítavali.
 Ak mobil stratí spojenie (zamknutie, Wi-Fi), PC ovládač do 0,4 s vynuluje – auto neostane na plyne.
 Funguje pre hry na PC (nie pre GT7 na PlayStation).
+
+**Vibrácie z hry:** keď hra rozvibruje ovládač (obrubníky, šmyk, náraz), zavibruje mobil. Silu
+nastavíš v ⚙. Funguje na Androide – iPhone stránkam vibrovať nedovolí.
 
 ## Štruktúra
 

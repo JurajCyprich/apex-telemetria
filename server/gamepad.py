@@ -43,6 +43,12 @@ class VirtualPad:
         self.owner = None
         self.last = 0.0
         self.active = False
+        # callback(owner, large, small) – hra rozvibrovala ovládač (volá sa z vlákna ovládača ViGEm)
+        self.on_rumble = None
+
+    def _notify(self, client, target, large_motor, small_motor, led_number, user_data):
+        if self.on_rumble and self.owner is not None:
+            self.on_rumble(self.owner, large_motor, small_motor)
 
     def ensure(self):
         """Ovládač vytvoríme až keď ho mobil prvýkrát použije (hra ho inak vidí stále)."""
@@ -54,6 +60,10 @@ class VirtualPad:
             import vgamepad  # noqa: PLC0415 – voliteľná závislosť
             self.pad = vgamepad.VX360Gamepad()
             log.info("Virtuálny Xbox ovládač pripojený")
+            try:
+                self.pad.register_notification(callback_function=self._notify)
+            except Exception as e:  # vibrácie sú len bonus – ovládač funguje aj bez nich
+                log.warning("Vibrácie ovládača nedostupné: %s", e)
             return True
         except ImportError:
             self.error = SETUP_HINT

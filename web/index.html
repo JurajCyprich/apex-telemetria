@@ -22,10 +22,17 @@
     <a href="/buttonbox">Button box</a>
   </nav>
   <div class="status"><span class="dot" id="dot"></span><span id="status">Čakám na hru…</span></div>
+  <button class="btn" id="engBtn">🔈 Inžinier</button>
   <button class="btn" id="phoneBtn">📱 Mobil</button>
   <button class="btn" id="settingsBtn">⚙ Nastavenia</button>
   <button class="btn" id="fs">⛶ Celá obrazovka</button>
 </header>
+
+<div class="update" id="update" hidden>
+  🎉 Je dostupná nová verzia <b id="updVer"></b> (máš <span id="updCur"></span>).
+  <a class="btn small primary" id="updLink" target="_blank" rel="noopener">Stiahnuť</a>
+  <button class="btn small" id="updClose" title="Skryť do ďalšej verzie">✕</button>
+</div>
 
 <div class="shift" id="shift"></div>
 
@@ -142,13 +149,40 @@
       </ul>
     </details>
     <div class="actions">
+      <span class="muted small" id="version" style="margin-right:auto"></span>
       <button class="btn" data-close>Zrušiť</button>
       <button class="btn primary" id="saveSettings">Uložiť</button>
     </div>
   </div>
 </div>
 
+<div class="modal-bg" id="engModal">
+  <div class="modal">
+    <h2>🔊 Hlasový inžinier</h2>
+    <p class="muted">Počas jazdy hlási časy kôl, palivo, vlajky a zabudnutý pit limiter. Hovorí, kým je otvorený tento dashboard.</p>
+    <label class="check"><input type="checkbox" id="engOn"> <b>Zapnutý</b></label>
+    <div class="field"><label>Hlas</label><select id="engVoice"></select></div>
+    <p class="warn small" id="engNoLocal" hidden>Slovenský ani český hlas nie je nainštalovaný – hlásenia budú znieť cudzím prízvukom.
+      Pridáš ho vo Windows: Nastavenia → Čas a jazyk → Reč → Spravovať hlasy → Pridať hlasy → Slovenčina. Potom reštartuj aplikáciu.</p>
+    <div class="cols">
+      <div class="field"><label>Hlasitosť</label><input type="range" id="engVolume" min="0.1" max="1" step="0.05"></div>
+      <div class="field"><label>Rýchlosť reči</label><input type="range" id="engRate" min="0.7" max="1.6" step="0.05"></div>
+    </div>
+    <h3 class="sub">Čo hlásiť</h3>
+    <label class="check"><input type="checkbox" id="eng_laps"> Čas kola a rozdiel oproti najlepšiemu kolu</label>
+    <label class="check"><input type="checkbox" id="eng_fuel"> Palivo (keď zostáva menej ako 3 kolá)</label>
+    <label class="check"><input type="checkbox" id="eng_flags"> Vlajky</label>
+    <label class="check"><input type="checkbox" id="eng_pit"> Pit limiter v boxovej uličke</label>
+    <div class="actions">
+      <button class="btn" id="engTest">▶ Vyskúšať hlas</button>
+      <span style="flex:1"></span>
+      <button class="btn primary" data-close>Hotovo</button>
+    </div>
+  </div>
+</div>
+
 <script src="/static/common.js"></script>
+<script src="/static/engineer.js"></script>
 <script src="/static/dashboard.js"></script>
 </body>
 </html>
