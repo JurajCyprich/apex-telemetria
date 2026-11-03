@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0b0d12">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Volant</title>
+<link rel="stylesheet" href="/static/common.css">
+<link rel="stylesheet" href="/static/wheel.css">
+</head>
+<body class="style-f1">
+<div class="wheel">
+  <section class="side">
+    <button class="paddle" data-btn="lb">▼<small>RADENIE −</small></button>
+    <div class="pedal brake" id="brake"><div class="fill"></div><b class="mono">0</b><span>BRZDA</span></div>
+  </section>
+
+  <section class="mid">
+    <div class="topbar">
+      <span class="dot" id="dot"></span>
+      <span class="status" id="status">Pripájam…</span>
+      <button class="btn small" id="calib">⟲ Stred</button>
+      <button class="btn small" id="setBtn">⚙</button>
+      <button class="btn small" id="fs" data-compact>⛶</button>
+    </div>
+    <div class="dash" id="dash" title="Ťukni pre ďalší štýl">
+      <div class="leds" id="leds"></div>
+      <canvas id="gauge"></canvas>
+      <div class="readout">
+        <div class="spd"><b class="mono" id="speed">0</b><small>km/h</small></div>
+        <div class="gear mono" id="gear">N</div>
+        <div class="info">
+          <div class="rpm mono"><span id="rpm">0</span><small> ot/min</small></div>
+          <div class="delta mono" id="delta">–</div>
+          <div class="lap mono" id="lapTime">-:--.---</div>
+        </div>
+      </div>
+    </div>
+    <div class="steerbar"><div class="center"></div><div class="knob" id="steerKnob"></div></div>
+    <div class="pads">
+      <button data-btn="a" class="c-green">A</button>
+      <button data-btn="b" class="c-red">B</button>
+      <button data-btn="x" class="c-blue">X</button>
+      <button data-btn="y" class="c-yellow">Y</button>
+      <button data-btn="back">⧉</button>
+      <button data-btn="start">☰</button>
+    </div>
+  </section>
+
+  <section class="side">
+    <button class="paddle" data-btn="rb">▲<small>RADENIE +</small></button>
+    <div class="pedal throttle" id="throttle"><div class="fill"></div><b class="mono">0</b><span>PLYN</span></div>
+  </section>
+</div>
+
+<div class="banner" id="padErr" hidden></div>
+
+<div class="overlay" id="start">
+  <div class="box">
+    <h2>🏎 Volant na mobile</h2>
+    <div id="startBody">
+      <p>Drž mobil na šírku ako volant. Zatáčaš otáčaním mobilu, palcami ovládaš plyn (vpravo) a brzdu (vľavo).</p>
+      <button class="btn primary big" id="go">▶ Štart</button>
+    </div>
+  </div>
+</div>
+
+<div class="rotate" id="rotate">↻ Otoč mobil na šírku</div>
+
+<div class="modal-bg" id="setModal">
+  <div class="modal">
+    <h2>⚙ Nastavenia volantu</h2>
+    <div class="field"><label>Štýl palubovky</label>
+      <select id="sStyle">
+        <option value="f1">F1 – LED svetlá</option>
+        <option value="gt">GT – pruh otáčok</option>
+        <option value="analog">Analógový otáčkomer</option>
+        <option value="minimal">Minimal – veľký prevod</option>
+      </select>
+    </div>
+    <h3 class="sub">Zatáčanie – profil <b id="profName"></b></h3>
+    <p class="muted small">Každá hra má vlastné nastavenie, prepne sa samo podľa hry, ktorú práve hráš.</p>
+    <canvas id="curve"></canvas>
+    <p class="mono small" id="liveVal"></p>
+    <div class="field"><label>Uhol natočenia mobilu na plný rejd: <b id="vRange"></b>° (menej = citlivejšie)</label>
+      <input type="range" id="sRange" min="20" max="180" step="5"></div>
+    <div class="field"><label>Krivka: <b id="vLin"></b> (1 = lineárne, viac = jemnejšie okolo stredu)</label>
+      <input type="range" id="sLin" min="1" max="3" step="0.1"></div>
+    <div class="field"><label>Vyhladenie: <b id="vSmooth"></b> % (viac = pokojnejšie, ale pomalšie)</label>
+      <input type="range" id="sSmooth" min="0" max="95" step="5"></div>
+    <div class="field"><label>Mŕtva zóna v strede: <b id="vDead"></b> %</label>
+      <input type="range" id="sDead" min="0" max="15" step="1"></div>
+    <div class="field"><label>Kompenzácia mŕtvej zóny hry: <b id="vAnti"></b> % (ak hra nereaguje na malé natočenie)</label>
+      <input type="range" id="sAnti" min="0" max="35" step="1"></div>
+    <label class="check"><input type="checkbox" id="sInvert"> Otočiť smer zatáčania</label>
+    <p class="tip small" id="gameTip"></p>
+    <button class="btn small" id="resetProf">Predvolené hodnoty profilu</button>
+
+    <h3 class="sub">Ostatné</h3>
+    <div class="field"><label>Citlivosť pedálov (krivka): <b id="vCurve"></b></label>
+      <input type="range" id="sCurve" min="0.5" max="2.5" step="0.1"></div>
+    <label class="check"><input type="checkbox" id="sVibrate"> Vibrovať pri radení (shift)</label>
+    <p class="muted small">V hre nastav ovládanie na <b>Xbox ovládač</b>: zatáčanie = ľavá páčka, plyn = RT, brzda = LT,
+      radenie = RB / LB. Tlačidlá A B X Y ☰ ⧉ si v hre priraď podľa seba.</p>
+    <div class="actions"><button class="btn primary" data-close>Hotovo</button></div>
+  </div>
+</div>
+
+<script src="/static/common.js"></script>
+<script src="/static/wheel.js"></script>
+</body>
+</html>

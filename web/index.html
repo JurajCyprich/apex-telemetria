@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0b0d12">
+<title>Apex Telemetria</title>
+<link rel="stylesheet" href="/static/common.css">
+<link rel="stylesheet" href="/static/dashboard.css">
+</head>
+<body>
+<header class="top">
+  <div class="logo">APEX<span>/</span>TELEMETRIA</div>
+  <nav class="tabs">
+    <a href="/" class="active">Živé dáta</a>
+    <a href="/analysis">Analýza kôl</a>
+    <a href="/buttonbox">Button box</a>
+  </nav>
+  <div class="status"><span class="dot" id="dot"></span><span id="status">Čakám na hru…</span></div>
+  <button class="btn" id="phoneBtn">📱 Mobil</button>
+  <button class="btn" id="settingsBtn">⚙ Nastavenia</button>
+  <button class="btn" id="fs">⛶ Celá obrazovka</button>
+</header>
+
+<div class="shift" id="shift"></div>
+
+<main class="dash">
+  <section class="card timing">
+    <h3>Časomiera</h3>
+    <div class="row big"><span class="muted">Aktuálne</span><span class="mono" id="lapTime">-:--.---</span></div>
+    <div class="delta mono" id="delta">±0.000</div>
+    <div class="row"><span class="muted">Posledné</span><span class="mono" id="lastLap">-:--.---</span></div>
+    <div class="row"><span class="muted">Najlepšie (hra)</span><span class="mono" id="bestLap">-:--.---</span></div>
+    <div class="row"><span class="muted">Referencia (uložené)</span><span class="mono purple" id="refLap">-:--.---</span></div>
+    <div class="row"><span class="muted">Kolo</span><span class="mono" id="lap">–</span></div>
+    <div class="row"><span class="muted">Pozícia</span><span class="mono" id="pos">–</span></div>
+  </section>
+
+  <section class="card center">
+    <div class="gear mono" id="gear">N</div>
+    <div class="speed"><span class="mono" id="speed">0</span><small>km/h</small></div>
+    <div class="rpmbar"><div id="rpmFill"></div></div>
+    <div class="rpmtext mono"><span id="rpm">0</span> / <span id="maxRpm">0</span> ot/min</div>
+    <div class="flags" id="flags"></div>
+  </section>
+
+  <section class="card tyres">
+    <h3>Pneumatiky <span class="muted" id="compound"></span></h3>
+    <div class="tyregrid" id="tyres"></div>
+  </section>
+
+  <section class="card inputs">
+    <h3>Vstupy</h3>
+    <div class="pedals">
+      <div class="pedal"><div class="bar"><div id="clutchBar" style="background:var(--blue)"></div></div><span>SPOJKA</span></div>
+      <div class="pedal"><div class="bar"><div id="brakeBar" style="background:var(--brake)"></div></div><span>BRZDA</span></div>
+      <div class="pedal"><div class="bar"><div id="throttleBar" style="background:var(--throttle)"></div></div><span>PLYN</span></div>
+      <canvas id="trace"></canvas>
+    </div>
+    <div class="steer"><div id="steerDot"></div></div>
+  </section>
+
+  <section class="card car">
+    <h3>Nastavenia auta</h3>
+    <div class="aids">
+      <div><small>TC</small><b class="mono" id="tc">–</b></div>
+      <div><small>TC2</small><b class="mono" id="tc2">–</b></div>
+      <div><small>ABS</small><b class="mono" id="abs">–</b></div>
+      <div><small>MAPA</small><b class="mono" id="map">–</b></div>
+      <div><small>BB %</small><b class="mono" id="bb">–</b></div>
+      <div><small>LIMITER</small><b class="mono" id="limiter">–</b></div>
+    </div>
+    <div class="row"><span class="muted">Vzduch / trať</span><span class="mono" id="temps">–</span></div>
+    <div class="row"><span class="muted">Voda</span><span class="mono" id="water">–</span></div>
+  </section>
+
+  <section class="card fuel">
+    <h3>Palivo</h3>
+    <div class="fuelbig mono"><span id="fuel">–</span><small id="fuelUnit">l</small></div>
+    <div class="fuelbar"><div id="fuelFill"></div></div>
+    <div class="row"><span class="muted">Spotreba / kolo</span><span class="mono" id="fuelLap">–</span></div>
+    <div class="row"><span class="muted">Vydrží na kôl</span><span class="mono" id="fuelLeft">–</span></div>
+  </section>
+
+  <section class="card map">
+    <h3>Trať <span class="muted" id="trackName"></span></h3>
+    <canvas id="mapCanvas"></canvas>
+  </section>
+
+  <section class="card gforce">
+    <h3>G-sily</h3>
+    <canvas id="gCanvas"></canvas>
+  </section>
+</main>
+
+<div class="modal-bg" id="phoneModal">
+  <div class="modal phone">
+    <h2>📱 Mobil</h2>
+    <p class="muted">Mobil musí byť na rovnakej Wi-Fi ako tento PC. Naskenuj QR kód alebo otvor adresu:</p>
+    <div class="phone-cols">
+      <div>
+        <h3 class="sub">Button box</h3>
+        <div class="qr" id="qr"></div>
+        <div id="urls" class="urls mono"></div>
+      </div>
+      <div id="wheelCol">
+        <h3 class="sub">🏎 Volant</h3>
+        <div class="qr" id="wheelQr"></div>
+        <div id="wheelUrls" class="urls mono"></div>
+        <p class="muted small">Pri prvom otvorení prehliadač ukáže varovanie o certifikáte –
+          daj <b>Rozšírené → Pokračovať</b>.</p>
+        <p class="warn small" id="padWarn" hidden></p>
+      </div>
+    </div>
+    <p class="muted small">Ak sa stránka nenačíta, povoľ Python vo Windows Firewalle (súkromná sieť).</p>
+    <button class="btn" data-close>Zavrieť</button>
+  </div>
+</div>
+
+<div class="modal-bg" id="settingsModal">
+  <div class="modal">
+    <h2>⚙ Nastavenia</h2>
+    <h3 class="sub">Hry</h3>
+    <div id="sourceList" class="sources"></div>
+    <div class="cols">
+      <div class="field"><label>F1 25 – UDP port</label><input type="number" id="f1Port"></div>
+      <div class="field"><label>Forza – UDP port</label><input type="number" id="forzaPort"></div>
+      <div class="field"><label>GT7 – IP adresa PlayStation (prázdne = hľadať v sieti)</label><input type="text" id="gt7Ip" placeholder="napr. 192.168.1.50"></div>
+    </div>
+    <details class="help">
+      <summary>Ako zapnúť telemetriu v hrách</summary>
+      <ul>
+        <li><b>Assetto Corsa / ACC / RaceRoom</b> – netreba nič, číta sa zdieľaná pamäť automaticky.</li>
+        <li><b>F1 25</b> – Nastavenia → Telemetria: UDP Telemetry <i>Zapnuté</i>, IP <i>127.0.0.1</i>, port <i>20777</i>, formát <i>2025</i>, frekvencia 60 Hz.</li>
+        <li><b>Forza Horizon 5/6, Forza Motorsport</b> – Nastavenia → HUD a hrateľnosť: Data Out <i>Zapnuté</i>, IP <i>127.0.0.1</i>, port <i>5300</i> (FM: formát Dash).</li>
+        <li><b>Gran Turismo 7</b> – PlayStation musí byť v rovnakej sieti. Zadaj jej IP adresu (Nastavenia PS → Sieť → Stav pripojenia).</li>
+      </ul>
+    </details>
+    <div class="actions">
+      <button class="btn" data-close>Zrušiť</button>
+      <button class="btn primary" id="saveSettings">Uložiť</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/common.js"></script>
+<script src="/static/dashboard.js"></script>
+</body>
+</html>

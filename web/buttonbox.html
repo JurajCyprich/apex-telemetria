@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0b0d12">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Button box</title>
+<link rel="stylesheet" href="/static/common.css">
+<link rel="stylesheet" href="/static/buttonbox.css">
+</head>
+<body>
+<div class="bb-top">
+  <div class="live">
+    <div class="g mono" id="gear">N</div>
+    <div class="cell"><small>km/h</small><b class="mono" id="speed">0</b></div>
+    <div class="cell"><small>TC</small><b class="mono" id="v_tc">–</b></div>
+    <div class="cell"><small>ABS</small><b class="mono" id="v_abs">–</b></div>
+    <div class="cell"><small>MAPA</small><b class="mono" id="v_map">–</b></div>
+    <div class="cell"><small>BB</small><b class="mono" id="v_bb">–</b></div>
+    <div class="cell"><small>PALIVO</small><b class="mono" id="v_fuel">–</b></div>
+    <div class="cell"><small>DELTA</small><b class="mono" id="v_delta">–</b></div>
+  </div>
+  <div class="tools">
+    <span class="dot" id="dot"></span>
+    <select id="profile"></select>
+    <button class="btn small" id="fs" data-compact>⛶</button>
+    <button class="btn small" id="editBtn" hidden>✎ Upraviť</button>
+    <a class="btn small" href="/" id="homeLink" hidden>Dashboard</a>
+  </div>
+</div>
+
+<main class="grid" id="grid"></main>
+
+<div class="modal-bg" id="editor">
+  <div class="modal wide">
+    <h2>✎ Úprava button boxu</h2>
+    <p class="muted">Postup: 1) nastav každému tlačidlu klávesu, 2) v hre otvor nastavenie ovládania,
+      klikni na akciu (napr. „TC +“) a stlač tlačidlo na mobile – hra si klávesu sama zapíše.</p>
+    <div class="ed-head">
+      <div class="field"><label>Profil</label><input type="text" id="profName"></div>
+      <div class="field"><label>Stĺpce</label><input type="number" id="profCols" min="2" max="8"></div>
+      <div class="field"><label>Dĺžka stlačenia (ms)</label><input type="number" id="holdMs" min="20" max="500"></div>
+      <button class="btn" id="newProf">+ Nový profil</button>
+      <button class="btn" id="delProf">Zmazať profil</button>
+    </div>
+    <table class="ed">
+      <thead><tr><th></th><th>Text</th><th>Klávesa</th><th>Režim</th><th>Farba</th><th>Zobraziť hodnotu</th><th></th></tr></thead>
+      <tbody id="edRows"></tbody>
+    </table>
+    <datalist id="keyList"></datalist>
+    <div class="actions">
+      <button class="btn" id="addBtn">+ Pridať tlačidlo</button>
+      <span style="flex:1"></span>
+      <button class="btn" data-close>Zrušiť</button>
+      <button class="btn primary" id="saveBB">Uložiť</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/common.js"></script>
+<script src="/static/buttonbox.js"></script>
+</body>
+</html>

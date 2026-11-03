@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0b0d12">
+<title>Analýza kôl</title>
+<link rel="stylesheet" href="/static/common.css">
+<link rel="stylesheet" href="/static/analysis.css">
+</head>
+<body>
+<header class="top">
+  <div class="logo">APEX<span>/</span>TELEMETRIA</div>
+  <nav class="tabs">
+    <a href="/">Živé dáta</a>
+    <a href="/analysis" class="active">Analýza kôl</a>
+    <a href="/buttonbox">Button box</a>
+  </nav>
+  <div class="status"></div>
+  <button class="btn" id="reload">↻ Obnoviť</button>
+  <button class="btn" id="fs">⛶ Celá obrazovka</button>
+</header>
+<div class="layout">
+  <aside class="card laps">
+    <h3>Uložené kolá</h3>
+    <p class="muted hint">Klikni = kolo A (modré). Shift+klik alebo „B“ = porovnať (oranžové).</p>
+    <div id="lapList"></div>
+  </aside>
+  <section class="main">
+    <div class="card summary" id="summary"><span class="muted">Vyber kolo zo zoznamu vľavo.</span></div>
+    <div class="row2">
+      <div class="card"><h3>Trať</h3><canvas id="map"></canvas></div>
+      <div class="card readout" id="readout"><h3>Hodnoty na kurzore</h3><div id="readVals" class="muted">Prejdi myšou nad grafy.</div></div>
+    </div>
+    <div class="card"><canvas id="charts"></canvas></div>
+  </section>
+</div>
+<script src="/static/common.js"></script>
+<script src="/static/analysis.js"></script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+.layout { display: grid; grid-template-columns: 320px 1fr; gap: 12px; padding: 12px 16px; align-items: start; }
+@media (max-width: 900px) { .layout { grid-template-columns: 1fr; } .laps { position: static; max-height: 40vh; } }
+.laps { max-height: calc(100vh - 90px); overflow: auto; position: sticky; top: 12px; }
+.hint { font-size: 12px; margin: -4px 0 10px; }
+.group { margin-bottom: 12px; }
+.group-title { font-size: 12px; font-weight: 600; padding: 6px 0; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+.group-title small { display: block; color: var(--muted); font-weight: 400; }
+.lap { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; cursor: pointer; }
+.lap:hover { background: var(--panel-2); }
+.lap.a { background: #0a84ff33; outline: 1px solid var(--blue); }
+.lap.b { background: #ff9f0a33; outline: 1px solid var(--orange); }
+.lap .time { font-family: var(--mono); font-weight: 700; }
+.lap .best { color: var(--purple); font-size: 11px; }
+.lap .date { color: var(--muted); font-size: 11px; flex: 1; text-align: right; }
+.lap .bbtn, .lap .del { opacity: 0; }
+.lap:hover .bbtn, .lap:hover .del { opacity: 1; }
+.main { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.summary { display: flex; gap: 24px; flex-wrap: wrap; align-items: center; }
+.summary .chip { display: flex; flex-direction: column; }
+.summary .chip small { color: var(--muted); font-size: 11px; }
+.summary .chip b { font-family: var(--mono); font-size: 20px; }
+.row2 { display: grid; grid-template-columns: 1.4fr 1fr; gap: 12px; }
+@media (max-width: 900px) { .row2 { grid-template-columns: 1fr; } }
+#map { width: 100%; height: 300px; display: block; }
+#charts { width: 100%; height: 760px; display: block; cursor: crosshair; }
+.readout table { width: 100%; font-family: var(--mono); border-collapse: collapse; }
+.readout td, .readout th { padding: 4px 6px; text-align: right; border-bottom: 1px solid #1e2332; }
+.readout th { color: var(--muted); font-weight: 500; font-family: inherit; }
+.readout td:first-child, .readout th:first-child { text-align: left; color: var(--muted); font-family: inherit; }
+.ca { color: var(--blue); } .cb { color: var(--orange); }

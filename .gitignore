@@ -1,0 +1,9 @@
+# prostredie a výstupy zostavenia
+.venv/
+build/
+dist/
+__pycache__/
+*.pyc
+
+# osobné dáta: kolá, nastavenia a súkromný kľúč HTTPS certifikátu
+data/

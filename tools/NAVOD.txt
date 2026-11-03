@@ -1,0 +1,30 @@
+﻿APEX TELEMETRIA – telemetria pre sim racing, button box a volant na mobile (zadarmo)
+=====================================================================================
+
+SPUSTENIE
+1. Rozbaľ celý ZIP do vlastného priečinka (napr. Dokumenty\ApexTelemetria).
+2. Spusti ApexTelemetria.exe.
+   - Windows môže ukázať „Windows ochránil váš počítač“ (aplikácia nie je podpísaná):
+     klikni „Ďalšie informácie“ → „Spustiť aj tak“.
+   - Keď sa Windows Firewall opýta, POVOĽ prístup pre súkromné siete – inak sa mobil nepripojí.
+3. Otvorí sa prehliadač s dashboardom (http://localhost:8777). Čierne okno nechaj otvorené,
+   zatvorením sa aplikácia vypne.
+
+Kolá a nastavenia sa ukladajú do priečinka „data“ vedľa .exe.
+
+NASTAVENIE HIER
+- Assetto Corsa, ACC, RaceRoom: netreba nič.
+- F1 25: Nastavenia → Telemetria: UDP Telemetry Zapnuté, IP 127.0.0.1, port 20777, formát 2025.
+- Forza Horizon 5/6, Forza Motorsport: HUD a hrateľnosť → Data Out Zapnuté, IP 127.0.0.1, port 5300.
+- Gran Turismo 7: v aplikácii ⚙ Nastavenia zadaj IP adresu PlayStation.
+
+MOBIL (rovnaká Wi-Fi ako PC)
+- Na dashboarde klikni „📱 Mobil“ a naskenuj QR kód.
+- Button box: tlačidlá posielajú klávesy do hry – v nastavení ovládania hry klikni na akciu
+  a stlač tlačidlo na mobile. Okno hry musí byť aktívne.
+- Volant: mobil = Xbox ovládač (náklon = zatáčanie, posuvníky = plyn/brzda).
+  1. RAZ spusti ViGEmBus_setup.msi (virtuálny Xbox ovládač) a potom reštartuj ApexTelemetria.exe.
+  2. Pri otvorení volantu mobil ukáže varovanie o certifikáte – je to tvoj PC,
+     daj „Rozšírené → Pokračovať“.
+  3. V hre nastav ovládanie na Xbox ovládač: zatáčanie = ľavá páčka, plyn = RT, brzda = LT,
+     radenie = RB / LB.

@@ -1,0 +1,123 @@
+html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+body { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; }
+
+.wheel { height: 100%; display: grid; grid-template-columns: minmax(96px, 22vw) 1fr minmax(96px, 22vw);
+  gap: 8px; padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right))
+  max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
+.side { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.mid { display: flex; flex-direction: column; gap: 6px; min-width: 0; min-height: 0; }
+
+/* radiace pádla */
+.paddle { flex: 0 0 26%; border: 0; border-radius: 14px; background: linear-gradient(#2a3145, #1b2030);
+  color: var(--text); font-size: 28px; font-weight: 800; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; box-shadow: inset 0 -4px 0 #0006; }
+.paddle small { font-size: 10px; color: var(--muted); letter-spacing: .5px; }
+.paddle.down, .pads button.down { filter: brightness(1.6); transform: scale(.97); }
+
+/* pedále */
+.pedal { position: relative; flex: 1; border-radius: 16px; background: #10131b; border: 1px solid var(--line);
+  overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+  padding-bottom: 10px; }
+.pedal .fill { position: absolute; left: 0; right: 0; bottom: 0; height: 0%; }
+.pedal.throttle .fill { background: linear-gradient(#30d158, #1a7a34); }
+.pedal.brake .fill { background: linear-gradient(#ff453a, #9a1c15); }
+.pedal b { position: relative; font-size: 22px; }
+.pedal span { position: relative; font-size: 11px; letter-spacing: 1px; color: #fffc; }
+.pedal::before { content: ""; position: absolute; inset: 10% 0 auto; border-top: 1px dashed #ffffff22; }
+
+/* horná lišta */
+.topbar { display: flex; align-items: center; gap: 6px; }
+.topbar .status { flex: 1; font-size: 12px; }
+
+/* volant indikátor */
+.steerbar { position: relative; height: 10px; border-radius: 5px; background: #10131b; flex: none; }
+.steerbar .center { position: absolute; left: 50%; top: -2px; bottom: -2px; width: 2px; background: var(--muted); }
+.steerbar .knob { position: absolute; top: 0; bottom: 0; left: 50%; width: 0; border-radius: 5px;
+  background: var(--blue); }
+
+/* tlačidlá */
+.pads { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; flex: 0 0 auto; }
+.pads button { border: 0; border-radius: 10px; padding: 8px 0; font-weight: 800; font-size: 16px;
+  background: #1b2030; color: var(--text); box-shadow: inset 0 -3px 0 #0006; }
+.pads .c-green { background: #1c9e48; } .pads .c-red { background: #c81e1e; }
+.pads .c-blue { background: #1d63d8; } .pads .c-yellow { background: #e0b000; color: #111; }
+
+/* ---------- palubovka ---------- */
+.dash { flex: 1; min-height: 0; position: relative; border-radius: 16px; background: #07080c;
+  border: 1px solid var(--line); overflow: hidden; display: flex; flex-direction: column; cursor: pointer; }
+.leds { display: grid; gap: 4px; padding: 8px; flex: none; }
+.leds i { display: block; background: #1a1e2a; transition: background .04s; }
+#gauge { display: none; }
+.readout { flex: 1; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px;
+  padding: 0 12px; min-height: 0; }
+.spd { display: flex; flex-direction: column; align-items: center; }
+.spd b { font-size: clamp(28px, 9vh, 64px); line-height: 1; }
+.spd small, .rpm small { color: var(--muted); font-size: 11px; }
+.gear { font-size: clamp(60px, 34vh, 190px); font-weight: 800; line-height: 1; text-align: center; min-width: 1ch; }
+.info { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.rpm { font-size: 16px; }
+.delta { font-size: clamp(16px, 6vh, 30px); font-weight: 700; }
+.delta.neg { color: var(--green); } .delta.pos { color: var(--red); }
+.lap { color: var(--muted); font-size: 13px; }
+
+/* F1 – 15 okrúhlych LED */
+.style-f1 .leds { grid-template-columns: repeat(15, 1fr); padding: 10px 14px; }
+.style-f1 .leds i { aspect-ratio: 1; border-radius: 50%; max-height: 26px; justify-self: center; width: 100%; max-width: 26px; }
+.style-f1 .leds i.g { background: #30d158; box-shadow: 0 0 10px #30d158; }
+.style-f1 .leds i.r { background: #ff2d2d; box-shadow: 0 0 10px #ff2d2d; }
+.style-f1 .leds i.b { background: #3b82ff; box-shadow: 0 0 10px #3b82ff; }
+.style-f1.shift-now .leds i { background: #3b82ff; box-shadow: 0 0 14px #3b82ff; }
+.style-f1.shift-now.blink .leds i { background: #1a1e2a; box-shadow: none; }
+
+/* GT – súvislý pruh otáčok */
+.style-gt .leds { grid-template-columns: repeat(30, 1fr); gap: 2px; padding: 10px 12px 4px; }
+.style-gt .leds i { height: clamp(18px, 9vh, 40px); border-radius: 2px; transform: skewX(-12deg); }
+.style-gt .leds i.on { background: var(--c); }
+.style-gt.shift-now.blink .leds i { background: #fff; }
+.style-gt .readout { grid-template-columns: auto 1fr auto; }
+.style-gt .gear { border: 3px solid var(--line); border-radius: 14px; padding: 0 .15em; font-size: clamp(50px, 26vh, 150px); }
+.style-gt .spd { order: 2; } .style-gt .spd b { font-size: clamp(48px, 22vh, 130px); }
+.style-gt .info { order: 3; } .style-gt .gear { order: 1; }
+
+/* analógový otáčkomer */
+.style-analog .leds { display: none; }
+.style-analog #gauge { display: block; position: absolute; inset: 0; width: 100%; height: 100%; }
+.style-analog .readout { position: relative; grid-template-columns: 1fr; grid-template-rows: 1fr auto; padding: 8px; }
+.style-analog .gear { font-size: clamp(40px, 20vh, 110px); align-self: center; }
+.style-analog .spd { display: none; }
+.style-analog .info { flex-direction: row; gap: 14px; }
+
+/* minimal – obrovský prevod, farba podľa otáčok */
+.style-minimal .leds { display: none; }
+.style-minimal .readout { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; padding: 6px; }
+.style-minimal .gear { font-size: clamp(90px, 50vh, 300px); color: var(--gc, #fff); transition: color .06s; }
+.style-minimal .spd { flex-direction: row; gap: 6px; align-items: baseline; }
+.style-minimal .spd b { font-size: clamp(22px, 8vh, 40px); }
+.style-minimal .info { flex-direction: row; gap: 14px; }
+.style-minimal.shift-now { --gc: #ff2d2d; }
+.style-minimal.shift-now.blink .dash { background: #3a0606; }
+
+/* prekryvy */
+.overlay { position: fixed; inset: 0; background: #000d; display: flex; align-items: center; justify-content: center;
+  z-index: 40; padding: 16px; }
+.overlay[hidden] { display: none; }
+.overlay .box { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 20px;
+  max-width: 520px; max-height: 100%; overflow: auto; text-align: center; }
+.overlay h2 { margin: 0 0 8px; }
+.overlay a { color: var(--blue); word-break: break-all; }
+.btn.big { font-size: 20px; padding: 12px 34px; margin-top: 6px; }
+.banner { position: fixed; left: 50%; top: 8px; transform: translateX(-50%); z-index: 30; max-width: 90%;
+  background: #5a1010; border: 1px solid var(--red); border-radius: 10px; padding: 8px 14px; font-size: 13px;
+  cursor: pointer; }
+.banner[hidden] { display: none; }
+.rotate { display: none; position: fixed; inset: 0; z-index: 35; background: var(--bg); align-items: center;
+  justify-content: center; font-size: 22px; font-weight: 700; }
+@media (orientation: portrait) and (max-width: 700px) { body.running .rotate { display: flex; } }
+.check { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
+.modal input[type=range] { width: 100%; }
+.small { font-size: 12px; }
+.actions { display: flex; justify-content: flex-end; margin-top: 12px; }
+#curve { width: 100%; height: 120px; display: block; background: #10131b; border-radius: 10px; }
+.sub { font-size: 12px; text-transform: uppercase; color: var(--muted); letter-spacing: 1px; margin: 14px 0 4px; }
+.sub b { color: var(--text); text-transform: none; letter-spacing: 0; }
+.tip { background: #0a84ff1a; border: 1px solid #0a84ff55; border-radius: 8px; padding: 8px 10px; }
