@@ -33,7 +33,7 @@ def _btn(id_, label, key, color="", value=None, mode="tap"):
 
 DEFAULT_BUTTONBOX = {
     "active": "gt3",
-    "hold_ms": 60,
+    "hold_ms": 100,
     "profiles": {
         "gt3": {
             "name": "GT3 / GT4",

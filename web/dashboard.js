@@ -224,6 +224,9 @@ $("phoneBtn").onclick = async () => {
   $("wheelQr").style.display = info.wheel_qr ? "" : "none";
   $("wheelUrls").innerHTML = info.wheel_urls.map((u) => `<a href="${u}" target="_blank">${u}</a>`).join("")
     || "HTTPS nie je zapnuté (chýba balík cryptography).";
+  $("displayQr").innerHTML = info.display_qr || "";
+  $("displayQr").style.display = info.display_qr ? "" : "none";
+  $("displayUrls").innerHTML = info.display_urls.map((u) => `<a href="${u}" target="_blank">${u}</a>`).join("");
   $("padWarn").hidden = !info.pad.error;
   $("padWarn").textContent = info.pad.error ? `⚠ ${info.pad.error}` : "";
   $("phoneModal").classList.add("open");

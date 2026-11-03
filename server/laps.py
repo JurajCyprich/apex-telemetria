@@ -16,6 +16,61 @@ def _safe(s):
     return re.sub(r"[^\w\-. ]+", "_", s or "unknown").strip()[:60] or "unknown"
 
 
+def find_corners(ch, window=60.0, min_drop=12.0):
+    """Zákruty v kole: miesta, kde rýchlosť výrazne klesne (lokálne minimum).
+
+    Vráti [{"n", "d" (vrchol), "brake_d" (začiatok brzdenia), "speed" (najnižšia km/h)}] podľa poradia na trati.
+    """
+    d, v = ch.get("d") or [], ch.get("speed") or []
+    brake = ch.get("brake") or [0.0] * len(d)
+    n = min(len(d), len(v))
+    if n < 50:
+        return []
+    k = 3  # vyhladenie kĺzavým priemerom (±3 vzorky ≈ ±3 m) proti šumu
+    sm = []
+    for i in range(n):
+        part = v[max(0, i - k):i + k + 1]
+        sm.append(sum(part) / len(part))
+    found = []
+    prev_apex = -1
+    for i in range(1, n - 1):
+        if sm[i] > sm[i - 1] or sm[i] > sm[i + 1]:
+            continue
+        lo, hi = bisect.bisect_left(d, d[i] - window), bisect.bisect_right(d, d[i] + window)
+        if sm[i] > min(sm[lo:hi]) + 1e-9:
+            continue  # v okolí je ešte nižšia rýchlosť
+        # najvyššia rýchlosť pred zákrutou – najviac 500 m dozadu, ale nie pred predchádzajúcou zákrutou
+        # (inak by brzdný bod druhej z dvoch tesných zákrut vyšiel pred prvou)
+        start = max(bisect.bisect_left(d, d[i] - 500), prev_apex + 1)
+        j = max(range(start, i + 1), key=sm.__getitem__)
+        peak = sm[j]
+        if peak - sm[i] < max(min_drop, peak * 0.08):
+            continue  # len mierne pribrzdenie, nie zákruta
+        bp = next((t for t in range(i, j - 1, -1) if sm[t] >= peak - 3), j)  # koniec rovinky
+        pedal = next((t for t in range(j, i + 1) if brake[t] > 0.15), None)  # prvé šliapnutie brzdy
+        if pedal is not None:
+            bp = min(bp, pedal)
+        a, b = bisect.bisect_left(d, d[i] - 15), bisect.bisect_right(d, d[i] + 15)
+        found.append({"d": d[i], "brake_d": d[bp], "speed": round(min(v[a:b])), "i": i})
+        prev_apex = i
+    corners = []
+    for c in found:
+        if corners:
+            p = corners[-1]
+            # šikana, alebo zákruta, v ktorej sa len povolil plyn (Parabolica): medzi minimami sa auto
+            # takmer nerozbehlo -> jedna zákruta s najnižšou rýchlosťou a skorším brzdením
+            peak = max(sm[p["i"]:c["i"] + 1])
+            if c["d"] - p["d"] < 80 or peak - max(p["speed"], c["speed"]) < max(20, 0.15 * peak):
+                low = c if c["speed"] < p["speed"] else p
+                corners[-1] = {**low, "brake_d": min(c["brake_d"], p["brake_d"]), "i": c["i"]}
+                continue
+        corners.append(c)
+    for idx, c in enumerate(corners):
+        c["n"] = idx + 1
+        del c["i"]
+    return corners
+
+
 class LapStore:
     """Kolá uložené ako JSON v data/laps/<hra>/<trať>/<auto>/<id>.json."""
 
@@ -85,6 +140,7 @@ class LapRecorder:
 
     def _reset_session(self):
         self.ref = None
+        self._corners = (None, [])  # (id referenčného kola, zákruty)
         self.session_best = 0.0
         self.fuel_used = []
         self.map_version = 0
@@ -105,9 +161,29 @@ class LapRecorder:
         step = max(1, len(xs) // 800)
         return [[round(xs[i], 1), round(zs[i], 1)] for i in range(0, len(xs), step)]
 
+    def corners(self):
+        """Zákruty najlepšieho kola (počítajú sa raz pre každé referenčné kolo)."""
+        if not self.ref:
+            return []
+        if self._corners[0] != self.ref.get("id"):
+            self._corners = (self.ref.get("id"), find_corners(self.ref["channels"]))
+            log.info("Zákruty v referenčnom kole: %d", len(self._corners[1]))
+        return self._corners[1]
+
+    def next_corner(self, d):
+        """Najbližšia zákruta, ktorej brzdný bod je ešte pred autom: {n, speed, dist (m)}."""
+        cs = self.corners()
+        if not cs:
+            return None
+        nxt = next((c for c in cs if c["brake_d"] > d), None)
+        if nxt is not None:
+            return {"n": nxt["n"], "speed": nxt["speed"], "dist": round(nxt["brake_d"] - d)}
+        lap_len = self.ref["channels"]["d"][-1]  # za poslednou zákrutou -> prvá v ďalšom kole
+        return {"n": cs[0]["n"], "speed": cs[0]["speed"], "dist": round(lap_len - d + cs[0]["brake_d"])}
+
     def update(self, f, dt):
         """Spracuje rámec, vráti doplnkové údaje (delta, palivo...)."""
-        extra = {"delta": None, "ref_time": self.ref["time"] if self.ref else None,
+        extra = {"delta": None, "corner": None, "ref_time": self.ref["time"] if self.ref else None,
                  "session_best": self.session_best or None,
                  "fuel_per_lap": None, "fuel_laps_left": None, "map_version": self.map_version}
         if self.fuel_used:
@@ -171,6 +247,7 @@ class LapRecorder:
                 frac = (d - rd[i - 1]) / max(1e-6, rd[i] - rd[i - 1])
                 ref_t = rt[i - 1] + frac * (rt[i] - rt[i - 1])
                 extra["delta"] = round(lap_t - ref_t, 3)
+            extra["corner"] = self.next_corner(d)
         return extra
 
     def _finish(self, p, f):

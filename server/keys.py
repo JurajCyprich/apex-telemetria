@@ -31,6 +31,17 @@ EXTENDED = {
 }
 ALL_KEYS = sorted(set(SCANCODES) | set(EXTENDED))
 
+# Numerická klávesnica: Windows z jej scan kódu robí Num7 len pri zapnutom NumLocku, inak Home –
+# a to by sa v hre zrazilo s tlačidlom Home. Preto posielame aj presnú virtuálnu klávesu.
+NUMPAD_VK = {f"num{i}": 0x60 + i for i in range(10)}
+NUMPAD_VK.update({"num*": 0x6A, "num+": 0x6B, "num-": 0x6D, "num.": 0x6E, "num/": 0x6F, "numenter": 0x0D})
+
+# klávesy, ktoré hry v menu priradenia často používajú samé (potvrdiť, zmazať, späť) – editor upozorní
+RISKY = {"enter": "potvrdzuje v menu", "numenter": "hra ho vidí ako Enter (potvrdzuje v menu)",
+         "delete": "v menu často maže priradenie", "backspace": "v menu často maže priradenie / späť",
+         "esc": "zatvára menu", "tab": "prepína v menu", "space": "potvrdzuje v menu",
+         "up": "pohyb v menu", "down": "pohyb v menu", "left": "pohyb v menu", "right": "pohyb v menu"}
+
 
 def parse(combo):
     """'ctrl+shift+t' -> [(scan, extended), ...]; ValueError pri neznámej klávese."""
@@ -71,14 +82,33 @@ if IS_WINDOWS:
     _user32.SendInput.restype = wintypes.UINT
 
     KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, KEYEVENTF_SCANCODE = 0x1, 0x2, 0x8
+    _user32.MapVirtualKeyW.argtypes = [wintypes.UINT, wintypes.UINT]
+    _user32.MapVirtualKeyW.restype = wintypes.UINT
+    _SCAN_TO_VK = {}
+
+    def _vk(scan, ext):
+        """Virtuálna klávesa k scan kódu (numerická klávesnica podľa tabuľky, nezávisle od NumLocku)."""
+        if (scan, ext) not in _SCAN_TO_VK:
+            vk = _user32.MapVirtualKeyW(scan | (0xE000 if ext else 0), 3)  # MAPVK_VSC_TO_VK_EX
+            _SCAN_TO_VK[(scan, ext)] = vk
+        return _SCAN_TO_VK[(scan, ext)]
+
+    _NUMPAD_BY_SCAN = {}
+    for _name, _vkc in NUMPAD_VK.items():
+        _s = SCANCODES.get(_name)
+        _NUMPAD_BY_SCAN[(_s, False) if _s is not None else (EXTENDED[_name], True)] = _vkc
 
     def _send(keys, up):
+        # VK + scan kód spolu: hry čítajúce virtuálne klávesy aj tie čítajúce scan kódy (DirectInput)
+        # dostanú to isté, bez ohľadu na stav NumLocku
         arr = (INPUT * len(keys))()
         for i, (scan, ext) in enumerate(keys):
-            flags = KEYEVENTF_SCANCODE | (KEYEVENTF_EXTENDEDKEY if ext else 0) | \
-                (KEYEVENTF_KEYUP if up else 0)
+            flags = (KEYEVENTF_EXTENDEDKEY if ext else 0) | (KEYEVENTF_KEYUP if up else 0)
+            vk = _NUMPAD_BY_SCAN.get((scan, ext)) or _vk(scan, ext)
+            if not vk:  # neznáma klávesa – aspoň samotný scan kód
+                flags |= KEYEVENTF_SCANCODE
             arr[i].type = 1
-            arr[i].u.ki = KEYBDINPUT(0, scan, flags, 0, 0)
+            arr[i].u.ki = KEYBDINPUT(vk, scan, flags, 0, 0)
         sent = _user32.SendInput(len(keys), arr, ctypes.sizeof(INPUT))
         if sent != len(keys):
             log.warning("SendInput odoslal %d/%d (hra beží ako správca?)", sent, len(keys))

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0b0d12">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Displej</title>
+<link rel="stylesheet" href="/static/common.css">
+<link rel="stylesheet" href="/static/display.css">
+</head>
+<body>
+<main class="board" id="board"></main>
+
+<!-- lišta v režime zobrazenia (skryje sa, ukáže sa po dotyku / pohybe myši) -->
+<div class="bar" id="bar">
+  <span class="dot" id="dot"></span>
+  <select id="layoutSel" title="Displej"></select>
+  <button class="btn small" id="editBtn">✎ Upraviť</button>
+  <button class="btn small" id="fs" data-compact>⛶</button>
+  <a class="btn small" href="/" id="homeLink">Dashboard</a>
+</div>
+
+<!-- editor -->
+<div class="edbar" id="edbar" hidden>
+  <b>✎ Úprava displeja</b>
+  <button class="btn small primary" id="addBtn">+ Pridať prvok</button>
+  <button class="btn small" id="newBtn">Nový displej</button>
+  <button class="btn small" id="dupBtn">Duplikovať</button>
+  <button class="btn small" id="delBtn">Zmazať displej</button>
+  <span class="spacer"></span>
+  <button class="btn small" id="cancelBtn">Zrušiť</button>
+  <button class="btn small primary" id="saveBtn">Uložiť</button>
+</div>
+<aside class="props" id="props" hidden></aside>
+
+<div class="modal-bg" id="palette">
+  <div class="modal">
+    <h2>+ Pridať prvok</h2>
+    <div class="types" id="types"></div>
+    <div class="actions"><button class="btn" data-close>Zavrieť</button></div>
+  </div>
+</div>
+
+<script src="/static/common.js"></script>
+<script src="/static/display.js"></script>
+</body>
+</html>

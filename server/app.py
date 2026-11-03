@@ -8,7 +8,7 @@ import time
 import segno
 from aiohttp import WSMsgType, web
 
-from . import certs, keys, updates
+from . import certs, displays, keys, updates
 from .gamepad import VirtualPad
 from .config import (DATA, WEB, load_buttonbox, load_settings, save_buttonbox,
                      save_settings)
@@ -53,6 +53,7 @@ class TelemetryApp:
     def __init__(self):
         self.settings = load_settings()
         self.buttonbox = load_buttonbox()
+        self.displays = displays.load()
         self.store = LapStore(DATA / "laps")
         self.recorder = LapRecorder(self.store)
         self.recorder.on_lap = lambda lap: self.events.append({"type": "lap", "data": lap})
@@ -195,7 +196,7 @@ class TelemetryApp:
                 self.held[ws].pop(btn["id"], None)
                 keys.key_up(combo)
             else:
-                await keys.tap(combo, int(self.buttonbox.get("hold_ms", 60)))
+                await keys.tap(combo, int(self.buttonbox.get("hold_ms", 100)))
         except ValueError as e:
             log.warning("Button box: %s", e)
 
@@ -204,11 +205,13 @@ class TelemetryApp:
         port, ips = self.settings["http_port"], lan_ips()
         urls = [f"http://{ip}:{port}/buttonbox" for ip in ips]
         wheel = [f"https://{ip}:{self.https_port}/wheel" for ip in ips] if self.https_port else []
+        display = [f"http://{ip}:{port}/display" for ip in ips]
 
         def qr(u):
             return segno.make(u[0]).svg_inline(scale=5, dark="#000", light="#fff") if u else ""
         return web.json_response({"urls": urls, "qr": qr(urls), "wheel_urls": wheel,
-                                  "wheel_qr": qr(wheel), "pad": self.pad.status(),
+                                  "wheel_qr": qr(wheel), "display_urls": display, "display_qr": qr(display),
+                                  "pad": self.pad.status(),
                                   "local": is_local(request),
                                   "sources": {sid: c.name for sid, c in SOURCES.items()}})
 
@@ -236,7 +239,7 @@ class TelemetryApp:
         return web.json_response(s)
 
     async def api_buttonbox(self, request):
-        return web.json_response({**self.buttonbox, "keys": keys.ALL_KEYS,
+        return web.json_response({**self.buttonbox, "keys": keys.ALL_KEYS, "risky": keys.RISKY,
                                   "can_edit": is_local(request)})
 
     @local_only
@@ -249,10 +252,36 @@ class TelemetryApp:
                 except ValueError as e:
                     raise web.HTTPBadRequest(text=f"{b.get('label')}: {e}")
         self.buttonbox = {"active": body.get("active", "gt3"),
-                          "hold_ms": int(body.get("hold_ms", 60)),
+                          "hold_ms": int(body.get("hold_ms", 100)),
                           "profiles": body.get("profiles", {})}
         save_buttonbox(self.buttonbox)
         return web.json_response(self.buttonbox)
+
+    # ---------- vlastné displeje (upravovať môže ktokoľvek v sieti – nič neovládajú) ----------
+    async def api_displays(self, request):
+        return web.json_response(self.displays)
+
+    async def api_display_save(self, request):
+        did = request.match_info["id"]
+        if not displays.ID_RE.match(did):
+            raise web.HTTPBadRequest(text="Neplatné id displeja")
+        if request.content_length and request.content_length > 300_000:
+            raise web.HTTPRequestEntityTooLarge(max_size=300_000, actual_size=request.content_length)
+        try:
+            layout = displays.validate(await request.json())
+        except ValueError as e:
+            raise web.HTTPBadRequest(text=str(e))
+        self.displays["layouts"][did] = layout
+        displays.save(self.displays)
+        self.events.append({"type": "display_saved", "id": did})  # otvorené displeje sa obnovia
+        return web.json_response(layout)
+
+    async def api_display_delete(self, request):
+        ok = self.displays["layouts"].pop(request.match_info["id"], None) is not None
+        if ok:
+            displays.save(self.displays)
+            self.events.append({"type": "display_saved", "id": request.match_info["id"]})
+        return web.json_response({"ok": ok})
 
     async def api_laps(self, request):
         return web.json_response(await asyncio.to_thread(self.store.list))
@@ -291,6 +320,7 @@ class TelemetryApp:
         r.add_get("/buttonbox", self.page("buttonbox.html"))
         r.add_get("/analysis", self.page("analysis.html"))
         r.add_get("/wheel", self.page("wheel.html"))
+        r.add_get("/display", self.page("display.html"))
         r.add_get("/ws", self.ws_handler)
         r.add_get("/api/info", self.api_info)
         r.add_get("/api/update", self.api_update)
@@ -298,6 +328,9 @@ class TelemetryApp:
         r.add_post("/api/settings", self.api_settings_save)
         r.add_get("/api/buttonbox", self.api_buttonbox)
         r.add_put("/api/buttonbox", self.api_buttonbox_save)
+        r.add_get("/api/displays", self.api_displays)
+        r.add_put("/api/displays/{id}", self.api_display_save)
+        r.add_delete("/api/displays/{id}", self.api_display_delete)
         r.add_get("/api/laps", self.api_laps)
         r.add_get("/api/laps/{id}", self.api_lap)
         r.add_delete("/api/laps/{id}", self.api_lap_delete)

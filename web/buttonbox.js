@@ -149,7 +149,7 @@ function openEditor() {
   const p = draft.profiles[draftProfile];
   $("profName").value = p.name;
   $("profCols").value = p.columns || 4;
-  $("holdMs").value = draft.hold_ms || 60;
+  $("holdMs").value = draft.hold_ms || 100;
   renderRows();
   $("editor").classList.add("open");
 }
@@ -160,12 +160,34 @@ function renderRows() {
     <tr data-i="${i}">
       <td><button class="btn small" data-act="up">▲</button><button class="btn small" data-act="down">▼</button></td>
       <td><input type="text" data-f="label" value="${escapeHtml(b.label)}"></td>
-      <td><div class="keycell"><input type="text" data-f="key" list="keyList" value="${escapeHtml(b.key)}"><button class="btn small" data-act="rec" title="Stlač klávesu na klávesnici">⌨</button></div></td>
+      <td><div class="keycell"><input type="text" data-f="key" list="keyList" value="${escapeHtml(b.key)}"><button class="btn small" data-act="rec" title="Stlač klávesu na klávesnici">⌨</button><span class="kwarn" ${keyWarning(b, p.buttons) ? "" : "hidden"} title="${escapeHtml(keyWarning(b, p.buttons))}">⚠</span></div></td>
       <td><select data-f="mode"><option value="tap" ${b.mode !== "hold" ? "selected" : ""}>stlačiť</option><option value="hold" ${b.mode === "hold" ? "selected" : ""}>držať</option></select></td>
       <td><select data-f="color">${COLORS.map((c) => `<option value="${c}" ${c === (b.color || "") ? "selected" : ""}>${COLOR_NAMES[c]}</option>`).join("")}</select></td>
       <td><select data-f="value">${Object.entries(VALUES).map(([k, n]) => `<option value="${k}" ${k === (b.value || "") ? "selected" : ""}>${n}</option>`).join("")}</select></td>
       <td><button class="btn small" data-act="del">✕</button></td>
     </tr>`).join("");
+}
+
+// prečo sa tlačidlo v hre nemusí dať priradiť: rovnaká klávesa ako iné tlačidlo, alebo klávesa,
+// ktorú hra v menu používa sama (Enter potvrdí, Delete zmaže priradenie…)
+function keyWarning(b, list) {
+  const key = (b.key || "").toLowerCase().replace(/\s/g, "");
+  if (!key) return "";
+  const twin = list.find((o) => o !== b && (o.key || "").toLowerCase().replace(/\s/g, "") === key);
+  if (twin) return `Rovnaká klávesa ako „${twin.label}“ – v hre sa priradí len jedno z nich.`;
+  const base = key.endsWith("num+") ? "num+" : key.split("+").pop();  // „num+“ obsahuje oddeľovač
+  const risky = cfg.risky && cfg.risky[base];
+  return risky ? `Klávesa „${key}“ – ${risky}. V niektorých hrách sa nedá priradiť, zvoľ radšej inú.` : "";
+}
+
+function refreshWarnings() {
+  const list = draft.profiles[draftProfile].buttons;
+  $("edRows").querySelectorAll("tr").forEach((tr) => {
+    const w = keyWarning(list[+tr.dataset.i], list);
+    const el = tr.querySelector(".kwarn");
+    el.hidden = !w;
+    el.title = w;
+  });
 }
 
 $("edRows").addEventListener("input", (e) => {
@@ -175,6 +197,7 @@ $("edRows").addEventListener("input", (e) => {
   const b = draft.profiles[draftProfile].buttons[+tr.dataset.i];
   if (f === "value" && !e.target.value) delete b.value;
   else b[f] = e.target.value;
+  if (f === "key") refreshWarnings();
 });
 
 $("edRows").addEventListener("click", (e) => {
@@ -223,13 +246,14 @@ function recordKey(btn, input, b) {
     const mods = [e.ctrlKey && "ctrl", e.shiftKey && "shift", e.altKey && "alt"].filter(Boolean);
     b.key = [...mods, k].join("+");
     input.value = b.key;
+    refreshWarnings();
   };
   window.addEventListener("keydown", handler, true);
 }
 
 $("profName").oninput = (e) => { draft.profiles[draftProfile].name = e.target.value; };
 $("profCols").oninput = (e) => { draft.profiles[draftProfile].columns = Math.max(2, Math.min(8, +e.target.value || 4)); };
-$("holdMs").oninput = (e) => { draft.hold_ms = Math.max(20, Math.min(500, +e.target.value || 60)); };
+$("holdMs").oninput = (e) => { draft.hold_ms = Math.max(20, Math.min(500, +e.target.value || 100)); };
 $("addBtn").onclick = () => {
   draft.profiles[draftProfile].buttons.push({ id: `b${Date.now()}`, label: "NOVÉ", key: "", mode: "tap", color: "" });
   renderRows();

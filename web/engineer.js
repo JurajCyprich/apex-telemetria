@@ -3,7 +3,7 @@
 // slovenčina, inak angličtina), alebo ho určí používateľ v nastaveniach.
 const engineer = (() => {
   const DEFAULTS = { on: false, voice: "", lang: "auto", volume: 1, rate: 1.05,
-    laps: true, fuel: true, flags: true, pit: true };
+    laps: true, fuel: true, flags: true, pit: true, corners: true, cornerLead: 3, cornerNum: true };
   const cfg = { ...DEFAULTS };
   try { Object.assign(cfg, JSON.parse(localStorage.getItem("engineer") || "{}")); } catch { /* bez úložiska */ }
   const save = () => { try { localStorage.setItem("engineer", JSON.stringify(cfg)); } catch { /* nevadí */ } };
@@ -42,6 +42,7 @@ const engineer = (() => {
         checkered: "Cieľ! Pekná jazda.", penalty: "Penalta", orange: "Oranžová vlajka, máš poškodenie" },
       green: "Zelená, trať je voľná",
       pit: "Pit limiter!",
+      corner: (n, v) => `Zákruta ${n}, ${v}`,
       test: "Rádio funguje.",
     },
     en: {
@@ -61,6 +62,7 @@ const engineer = (() => {
         checkered: "Checkered flag! Nice drive.", penalty: "Penalty", orange: "Orange flag, you have damage" },
       green: "Green flag, track is clear",
       pit: "Pit limiter!",
+      corner: (n, v) => `Turn ${n}, ${v}`,
       test: "Radio check.",
     },
   };
@@ -101,6 +103,7 @@ const engineer = (() => {
   let prevRef = null;     // najlepšie uložené kolo pred práve dokončeným kolom
   let flag = { shown: "", cand: "", since: 0 };
   let pitSince = 0;
+  let cornerSaid = "";  // kolo-zákruta, ktorá už bola ohlásená
 
   function frame(d) {
     if (!d.connected) {
@@ -124,6 +127,18 @@ const engineer = (() => {
         }
       }
       flag.shown = flag.cand;
+    }
+
+    // rýchlosť pred zákrutou: najnižšia rýchlosť v tej zákrute z najlepšieho uloženého kola s týmto autom.
+    // Hlásime s predstihom v sekundách pred bodom brzdenia (pri vyššej rýchlosti teda skôr v metroch).
+    const c = d.corner;
+    if (cfg.on && cfg.corners && c && d.speed > 30) {
+      const secs = c.dist / (d.speed / 3.6);
+      const key = `${d.lap}-${c.n}`;
+      if (secs <= cfg.cornerLead && secs > 0.5 && key !== cornerSaid) {
+        cornerSaid = key;
+        say(cfg.cornerNum ? t().corner(c.n, c.speed) : String(c.speed));
+      }
     }
 
     // v boxovej uličke bez pit limitera
@@ -186,9 +201,10 @@ const engineer = (() => {
       $("engNoLocal").hidden = !!localVoice() || !voices.length || lang() !== "sk";
       $("engOn").checked = cfg.on;
       $("engLang").value = cfg.lang;
-      for (const k of ["laps", "fuel", "flags", "pit"]) $(`eng_${k}`).checked = cfg[k];
+      for (const k of ["laps", "fuel", "flags", "pit", "corners", "cornerNum"]) $(`eng_${k}`).checked = cfg[k];
       $("engVolume").value = cfg.volume;
       $("engRate").value = cfg.rate;
+      $("engLead").value = cfg.cornerLead;
       showLang();
     };
     speechSynthesis.addEventListener("voiceschanged", () => {
@@ -201,12 +217,13 @@ const engineer = (() => {
     $("engLang").addEventListener("change", (e) => { cfg.lang = e.target.value; save(); fill(); });
     $("engVolume").addEventListener("input", (e) => { cfg.volume = +e.target.value; save(); });
     $("engRate").addEventListener("input", (e) => { cfg.rate = +e.target.value; save(); });
-    for (const k of ["laps", "fuel", "flags", "pit"]) {
+    $("engLead").addEventListener("change", (e) => { cfg.cornerLead = +e.target.value; save(); });
+    for (const k of ["laps", "fuel", "flags", "pit", "corners", "cornerNum"]) {
       $(`eng_${k}`).addEventListener("change", (e) => { cfg[k] = e.target.checked; save(); });
     }
     $("engTest").addEventListener("click", () => {
       const tx = t();
-      say(`${tx.test} ${lapText(83.47, 83.7, tx)} ${tx.fuel(3)}`, null, 0, true);
+      say(`${tx.test} ${tx.corner(3, 87)}. ${lapText(83.47, 83.7, tx)} ${tx.fuel(3)}`, null, 0, true);
     });
   }
 

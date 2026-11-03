@@ -19,6 +19,7 @@
   <nav class="tabs">
     <a href="/" class="active">Živé dáta</a>
     <a href="/analysis">Analýza kôl</a>
+    <a href="/display">Displej</a>
     <a href="/buttonbox">Button box</a>
   </nav>
   <div class="status"><span class="dot" id="dot"></span><span id="status">Čakám na hru…</span></div>
@@ -123,6 +124,12 @@
           daj <b>Rozšírené → Pokračovať</b>.</p>
         <p class="warn small" id="padWarn" hidden></p>
       </div>
+      <div>
+        <h3 class="sub">📟 Displej</h3>
+        <div class="qr" id="displayQr"></div>
+        <div id="displayUrls" class="urls mono"></div>
+        <p class="muted small">Vlastná palubovka na tablete alebo druhom PC – prvky si poskladáš v ✎ Upraviť.</p>
+      </div>
     </div>
     <p class="muted small">Ak sa stránka nenačíta, povoľ Python vo Windows Firewalle (súkromná sieť).</p>
     <button class="btn" data-close>Zavrieť</button>
@@ -180,6 +187,13 @@
     <label class="check"><input type="checkbox" id="eng_fuel"> Palivo (keď zostáva menej ako 3 kolá)</label>
     <label class="check"><input type="checkbox" id="eng_flags"> Vlajky</label>
     <label class="check"><input type="checkbox" id="eng_pit"> Pit limiter v boxovej uličke</label>
+    <label class="check"><input type="checkbox" id="eng_corners"> Rýchlosť pred zákrutou (z tvojho najlepšieho kola s týmto autom)</label>
+    <div class="cols">
+      <label class="check"><input type="checkbox" id="eng_cornerNum"> Hovoriť aj číslo zákruty</label>
+      <div class="field"><label>Predstih pred brzdením</label>
+        <select id="engLead"><option value="2">2 s</option><option value="3">3 s</option><option value="4">4 s</option><option value="5">5 s</option></select></div>
+    </div>
+    <p class="muted small">Zákruty sa nájdu v najlepšom uloženom kole na danej trati s daným autom – kým ho nemáš, hlásenie mlčí.</p>
     <div class="actions">
       <button class="btn" id="engTest">▶ Vyskúšať hlas</button>
       <span style="flex:1"></span>

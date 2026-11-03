@@ -48,8 +48,24 @@ Bez hry si to môžeš vyskúšať: **⚙ Nastavenia → Demo (simulácia bez hr
 - **Hlasový inžinier** (🔈 Inžinier na dashboarde) – hlási čas kola a rozdiel oproti najlepšiemu,
   palivo (menej ako 3 kolá), vlajky a zabudnutý pit limiter. Hovorí hlasom Windows – slovenským
   (*Microsoft Filip*), ak je nainštalovaný: Nastavenia → Čas a jazyk → Reč → Pridať hlasy → Slovenčina.
+  S anglickým hlasom hovorí po anglicky (alebo zvoľ jazyk ručne).
+  **Rýchlosť pred zákrutou:** z tvojho najlepšieho uloženého kola s daným autom na danej trati nájde
+  zákruty a ich najnižšiu rýchlosť a pred každou ju ohlási („Zákruta 3, 104“) – s predstihom 2–5 s
+  pred bodom brzdenia. Kým na trati nemáš uložené kolo, mlčí.
 - **Kontrola aktualizácií** – pri štarte sa pozrie na GitHub; keď je nová verzia, dashboard ukáže
   pruh s odkazom na stiahnutie.
+
+## Vlastný displej (tablet, druhý PC, mobil)
+
+Záložka **Displej** (alebo QR kód *Displej* v **📱 Mobil**) – vlastná palubovka na inom zariadení
+v sieti. Hotové šablóny: *Palubovka*, *Časomiera*, *Pneumatiky a auto*.
+
+V **✎ Upraviť** si ju poskladáš sám: **+ Pridať prvok** (prevod, hodnota, shift svetlá, pruh otáčok,
+delta, pedále, pneumatiky, mapa, G-sily, vlajka, text, tlačidlo z button boxu), ťahaním prvok posunieš,
+modrým rohom zmeníš veľkosť, v paneli vpravo nastavíš údaj, popis, farbu a desatinné miesta.
+Prvok **Hodnota** zobrazí čokoľvek z telemetrie (TC, ABS, teploty, tlaky, palivo, rýchlosť ďalšej
+zákruty…). Displeje sa ukladajú na PC s aplikáciou – upravený na jednom zariadení sa hneď
+prekreslí na všetkých, kde je otvorený. Text sa sám prispôsobí veľkosti prvku.
 
 ## Button box – nastavenie
 
@@ -60,6 +76,12 @@ Bez hry si to môžeš vyskúšať: **⚙ Nastavenia → Demo (simulácia bez hr
 3. V hre choď do **nastavenia ovládania**, klikni na akciu (napr. *TC zvýšiť*) a stlač príslušné
    tlačidlo na mobile – hra si klávesu zapíše sama.
 4. Počas jazdy musí byť **okno hry aktívne** (klávesy idú do okna v popredí).
+
+**Keď sa niektoré tlačidlo nedá v hre priradiť:** v editore button boxu svieti pri ňom ⚠ –
+buď má rovnakú klávesu ako iné tlačidlo (priradilo by sa len jedno), alebo je to klávesa, ktorú hry
+v menu používajú samé (Enter / Num Enter potvrdí, Delete zmaže priradenie, Esc zavrie menu).
+Daj mu inú klávesu. Klávesy sa posielajú nezávisle od NumLocku (Num7 je vždy Num7, nie Home).
+Ak hra krátke stlačenie nezachytí, zvýš v editore *Dĺžku stlačenia* (predvolene 100 ms).
 
 Upraviť button box a nastavenia sa dá len z PC, kde aplikácia beží. Mobil môže tlačidlá len stláčať.
 
@@ -103,9 +125,10 @@ server/          Python backend (aiohttp)
   laps.py        záznam kôl, delta, spotreba paliva
   keys.py        simulácia kláves pre button box (SendInput)
   gamepad.py     virtuálny Xbox ovládač pre volant na mobile (ViGEmBus)
+  displays.py    vlastné displeje (rozloženie prvkov, šablóny)
   certs.py       vlastný HTTPS certifikát (gyroskop na mobile vyžaduje HTTPS)
   app.py         web server (HTTP 8777 + HTTPS 8778), WebSocket, API
-web/             dashboard, analýza, button box, volant (čisté HTML/JS, bez internetu)
+web/             dashboard, analýza, displej, button box, volant (čisté HTML/JS, bez internetu)
 data/            nastavenia, button box profily, uložené kolá a certifikát (vytvorí sa sám)
 ```
 

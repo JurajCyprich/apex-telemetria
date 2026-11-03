@@ -43,3 +43,6 @@ body { display: flex; flex-direction: column; user-select: none; -webkit-user-se
 .ed .rec { background: var(--accent); color: #fff; }
 .actions { display: flex; gap: 8px; margin-top: 14px; align-items: center; }
 .empty { grid-column: 1 / -1; text-align: center; color: var(--muted); align-self: center; }
+.ed .kwarn { color: var(--orange); font-size: 18px; cursor: help; align-self: center; }
+.ed .kwarn[hidden] { display: none; }
+.risk-note { color: var(--orange); font-size: 12px; }
