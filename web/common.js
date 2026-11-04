@@ -176,3 +176,31 @@ function drawTrack(ctx, w, h, points, style = {}) {
   ctx.stroke();
   return project;
 }
+
+// ---------- haptika ----------
+// Android: navigator.vibrate. iPhone Safari vibrovanie stránkam nepovoľuje; jediná cesta je
+// prepnúť skrytý systémový prepínač (<input type=checkbox switch>, iOS 17.4+), ktorý ťukne
+// Taptic Engine. Apple to v novších iOS obmedzuje, preto je to len "ak to pôjde, fajn".
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+  || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const CAN_VIBRATE = typeof navigator.vibrate === "function";
+let _hapLabel = null;
+function haptic(ms = 15) {
+  if (CAN_VIBRATE) { navigator.vibrate(ms); return; }
+  if (!IS_IOS) return;
+  try {
+    if (!_hapLabel) {
+      _hapLabel = document.createElement("label");
+      _hapLabel.setAttribute("aria-hidden", "true");
+      _hapLabel.style.cssText = "position:fixed;left:-100px;top:0;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none";
+      const sw = document.createElement("input");
+      sw.type = "checkbox";
+      sw.setAttribute("switch", "");
+      sw.tabIndex = -1;
+      sw.addEventListener("click", (e) => e.stopPropagation());
+      _hapLabel.append(sw);
+      document.body.append(_hapLabel);
+    }
+    _hapLabel.click();
+  } catch { /* nič */ }
+}

@@ -412,7 +412,7 @@ function bindPress(el, profileId, b) {
     pressed = true;
     try { el.setPointerCapture(e.pointerId); } catch { /* zachytenie je len pohodlie – stlačenie musí prejsť */ }
     el.classList.add("down");
-    navigator.vibrate?.(15);
+    haptic(15);
     ws.send({ type: "press", profile: profileId, id: b.id, action: b.mode === "hold" ? "down" : "tap" });
   };
   const up = (e) => {

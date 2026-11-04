@@ -7,3 +7,4 @@ __pycache__/
 
 # osobné dáta: kolá, nastavenia a súkromný kľúč HTTPS certifikátu
 data/
+.claude/

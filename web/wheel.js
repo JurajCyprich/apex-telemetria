@@ -1,7 +1,7 @@
 // Volant na mobile: náklon mobilu = zatáčanie, posuvníky = plyn/brzda, posiela sa ako Xbox ovládač.
 const $ = (id) => document.getElementById(id);
 const STYLES = { f1: "F1 – LED svetlá", gt: "GT – pruh otáčok", analog: "Analógový otáčkomer", minimal: "Minimal" };
-const DEFAULTS = { style: "f1", curve: 1, vibrate: true, rumble: true, rumbleGain: 100 };
+const DEFAULTS = { style: "f1", curve: 1, vibrate: true, rumble: true, rumbleGain: 100, rumbleFx: !CAN_VIBRATE };
 // nastavenia zatáčania – každá hra má vlastný profil, prepína sa podľa telemetrie
 const STEER_DEFAULTS = { range: 90, dead: 1, anti: 0, lin: 1, smooth: 40, invert: false };
 const GENERIC = "Všeobecný";
@@ -76,7 +76,7 @@ document.querySelectorAll("[data-btn]").forEach((el) => {
     el.setPointerCapture(e.pointerId);
     input.btn.add(name);
     el.classList.add("down");
-    navigator.vibrate?.(12);
+    haptic(12);
     send(true);
   });
   const off = (e) => {
@@ -96,6 +96,7 @@ function releaseAll() {
   input.btn.clear();
   rumbleLevel = 0;
   navigator.vibrate?.(0);
+  showRumbleFx(0);
 }
 
 // ---------- natočenie mobilu ----------
@@ -271,7 +272,7 @@ function render() {
   const wasShift = shiftNow;
   shiftNow = rpm >= shiftAt && rpm > 0;
   document.body.classList.toggle("shift-now", shiftNow);
-  if (shiftNow && !wasShift && cfg.vibrate) navigator.vibrate?.(40);
+  if (shiftNow && !wasShift && cfg.vibrate) haptic(40);
 
   if (cfg.style === "f1") {
     const n = Math.round(ratio * 15);
@@ -365,18 +366,30 @@ ws = connectWS((d) => {
 padErr.addEventListener("click", () => { padErr.hidden = true; });
 
 // ---------- vibrácie z hry (hra rozvibruje Xbox ovládač -> zavibruje mobil) ----------
-// Mobil nevie meniť silu vibrácie, len jej dĺžku: silu prevedieme na dĺžku pulzu v každých 100 ms.
-const canVibrate = typeof navigator.vibrate === "function";
+// Android: mobil nevie meniť silu vibrácie, len jej dĺžku – silu prevedieme na dĺžku pulzu každých 100 ms.
+// iPhone: stránka vibrovať nesmie, takže (1) skúsime haptické ťuknutia (hustejšie = silnejšie)
+// a (2) ukážeme vibrácie na obrazovke – okraj zabliká a palubovka sa zatrasie.
+const canVibrate = CAN_VIBRATE;
 let rumbleLevel = 0;
+let rumbleTick = 0;
 function setRumble(large, small) {
   // veľký motor = hrubé otrasy (obrubníky, náraz), malý = jemné (šmyk, ABS) – malý berieme slabšie
   const level = Math.max(large, small * 0.7) / 255;
   rumbleLevel = cfg.rumble ? Math.min(1, level * cfg.rumbleGain / 100) : 0;
   if (rumbleLevel < 0.03 && canVibrate) navigator.vibrate(0);
+  showRumbleFx(rumbleLevel);
+}
+function showRumbleFx(level) {
+  const on = level >= 0.03 && cfg.rumbleFx && running;
+  document.body.classList.toggle("rumbling", on);
+  document.body.style.setProperty("--rumble", on ? level.toFixed(2) : "0");
 }
 setInterval(() => {
-  if (!canVibrate || !running || document.visibilityState !== "visible" || rumbleLevel < 0.03) return;
-  navigator.vibrate(Math.round(12 + 88 * rumbleLevel));
+  if (!running || document.visibilityState !== "visible" || rumbleLevel < 0.03) return;
+  if (canVibrate) { navigator.vibrate(Math.round(12 + 88 * rumbleLevel)); return; }
+  // iPhone: ťuknutie každých 300 ms pri slabých vibráciách až každých 100 ms pri najsilnejších
+  rumbleTick += 100;
+  if (IS_IOS && rumbleTick >= 300 - 200 * rumbleLevel) { rumbleTick = 0; haptic(); }
 }, 100);
 
 // ---------- štart, celá obrazovka, nastavenia ----------
@@ -438,7 +451,7 @@ function fillSettings() {
   $("sInvert").checked = sp.invert;
   $("sVibrate").checked = cfg.vibrate;
   $("sRumble").checked = cfg.rumble;
-  $("rumbleBox").hidden = !canVibrate;
+  $("sRumbleFx").checked = cfg.rumbleFx;
   $("noRumble").hidden = canVibrate;
   showValues();
   drawCurve();
@@ -492,6 +505,19 @@ $("sRumble").addEventListener("change", (e) => {
   cfg.rumble = e.target.checked;
   saveCfg();
   if (!cfg.rumble) setRumble(0, 0);
+});
+$("sRumbleFx").addEventListener("change", (e) => {
+  cfg.rumbleFx = e.target.checked;
+  saveCfg();
+  showRumbleFx(rumbleLevel);
+});
+$("testRumble").addEventListener("click", () => {
+  // test priamo z ťuknutia – ukáže, či tento mobil vibrácie/ťuknutia vôbec zvláda
+  if (canVibrate) { navigator.vibrate([80, 60, 80, 60, 160]); return; }
+  haptic();
+  [150, 300, 450].forEach((t) => setTimeout(haptic, t));
+  showRumbleFx(1); document.body.classList.add("rumbling");
+  setTimeout(() => showRumbleFx(rumbleLevel), 700);
 });
 $("resetProf").addEventListener("click", () => {
   sp = { ...STEER_DEFAULTS };

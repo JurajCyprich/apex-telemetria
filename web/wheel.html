@@ -109,8 +109,12 @@
       <label class="check"><input type="checkbox" id="sRumble"> Vibrácie z hry (obrubníky, šmyk, nárazy)</label>
       <div class="field"><label>Sila vibrácií z hry: <b id="vRumbleGain"></b> %</label>
         <input type="range" id="sRumbleGain" min="20" max="200" step="10"></div>
+      <label class="check"><input type="checkbox" id="sRumbleFx"> Ukázať vibrácie aj na obrazovke (okraj zabliká, palubovka sa zatrasie)</label>
+      <button class="btn small" id="testRumble">Vyskúšať vibrácie</button>
     </div>
-    <p class="muted small" id="noRumble" hidden>Vibrácie z hry: tento mobil (prehliadač) vibrovanie nepodporuje – iPhone ho stránkam nepovoľuje.</p>
+    <p class="muted small" id="noRumble" hidden>📱 iPhone: Safari stránkam skutočné vibrovanie nepovoľuje (je to obmedzenie od Apple, nie appky).
+      Namiesto toho skúšame krátke haptické ťuknutia – fungujú len na niektorých verziách iOS (17.4 až približne 26.4)
+      a len keď máš zapnuté Nastavenia → Zvuky a haptika → Systémová haptika. Vibrácie z hry preto ukazujeme aj na obrazovke.</p>
     <p class="muted small">V hre nastav ovládanie na <b>Xbox ovládač</b>: zatáčanie = ľavá páčka, plyn = RT, brzda = LT,
       radenie = RB / LB. Tlačidlá A B X Y ☰ ⧉ si v hre priraď podľa seba.</p>
     <div class="actions"><button class="btn primary" data-close>Hotovo</button></div>

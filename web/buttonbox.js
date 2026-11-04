@@ -82,7 +82,7 @@ function bindPress(el, b) {
     if (pressed) return;
     pressed = true;
     el.classList.add("down");
-    if (navigator.vibrate) navigator.vibrate(15);
+    haptic(15);
     ws.send({ type: "press", profile: profileId, id: b.id, action: b.mode === "hold" ? "down" : "tap" });
   };
   const up = (e) => {
