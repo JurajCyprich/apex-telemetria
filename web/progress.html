@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0b0d12">
+<title>Pokrok</title>
+<link rel="stylesheet" href="/static/common.css">
+<link rel="stylesheet" href="/static/progress.css">
+</head>
+<body>
+<header class="top">
+  <div class="logo">APEX<span>/</span>TELEMETRIA</div>
+  <nav class="tabs">
+    <a href="/">Živé dáta</a>
+    <a href="/analysis">Analýza kôl</a>
+    <a href="/street">Street view</a>
+    <a href="/progress" class="active">Pokrok</a>
+    <a href="/display">Displej</a>
+    <a href="/buttonbox">Button box</a>
+  </nav>
+  <div class="status"></div>
+  <select id="combo" title="Trať a auto"></select>
+  <button class="btn" id="fs">⛶ Celá obrazovka</button>
+</header>
+<main class="wrap">
+  <div class="card chips" id="chips"><span class="muted">Načítavam…</span></div>
+  <div class="card">
+    <h3>Časy kôl <span class="muted">· bodka = kolo, fialová čiara = tvoj najlepší čas v tom čase, prerušovaná = teoretické najlepšie</span></h3>
+    <canvas id="chart"></canvas>
+    <p class="muted small" id="tip">Prejdi myšou nad bodky.</p>
+  </div>
+  <div class="card">
+    <h3>Po dňoch</h3>
+    <div id="days"></div>
+    <p class="muted small">Konzistencia = o koľko sa ti v priemere líšia kolá (bez kôl pomalších o viac ako 7 % – výlety mimo trať, boxy). Menej = stabilnejšia jazda.</p>
+  </div>
+</main>
+<script src="/static/common.js"></script>
+<script src="/static/progress.js"></script>
+</body>
+</html>

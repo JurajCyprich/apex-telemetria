@@ -30,3 +30,13 @@ MOBIL (rovnaká Wi-Fi ako PC)
      daj „Rozšírené → Pokračovať“.
   3. V hre nastav ovládanie na Xbox ovládač: zatáčanie = ľavá páčka, plyn = RT, brzda = LT,
      radenie = RB / LB.
+
+STREET VIEW (obraz kola)
+- Na dashboarde klikni „🎥 Obraz“ a zapni nahrávanie. Hru prepni na „okno bez okraja“ (borderless),
+  exkluzívna celá obrazovka sa často nedá zachytiť.
+- Po kole otvor záložku Street view: prechádzaš kolo ako v Google Maps (šípky, koliesko, klik do mapy),
+  vidíš obraz, rýchlosť, brzdenie, svoju stopu a najrýchlejšiu stopu.
+
+OBS OVERLAY
+- Na záložke Displej klikni „📺 OBS“ – skopíruje adresu. V OBS pridaj Zdroj → Prehliadač, vlož adresu,
+  rozmer 1920×1080. Pozadie je priehľadné.

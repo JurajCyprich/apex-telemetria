@@ -9,7 +9,7 @@ import time
 import segno
 from aiohttp import WSMsgType, web
 
-from . import certs, displays, keys, updates
+from . import analytics, capture, certs, displays, keys, updates
 from .gamepad import VirtualPad
 from .config import (DATA, WEB, load_buttonbox, load_settings, save_buttonbox,
                      save_settings)
@@ -59,6 +59,16 @@ class TelemetryApp:
         self.recorder = LapRecorder(self.store)
         self.recorder.on_lap = lambda lap: self.events.append({"type": "lap", "data": lap})
         self.recorder.on_corner = lambda st: self.events.append({"type": "corner_stats", "data": st})
+        self.recorder.on_saved = self._lap_saved
+        self.recorder.on_discard = lambda seq: self.capture.discard(seq)
+        self.recorder.on_session = lambda key: self._schedule_analysis(key)
+        self.analysis = {}       # (hra, trať, auto) -> (podpis kôl, rozbor)
+        self.analysis_task = None
+        self.capture = capture.Recorder()
+        self.capture.clear_tmp()
+        cs = self.settings.get("capture") or {}
+        self.capture.configure(enabled=cs.get("on", False), monitor=cs.get("monitor", 1),
+                               fps=cs.get("fps", 6), width=cs.get("width", 960))
         self.latest = {}
         self.active_id = None
         self.tasks = {}
@@ -125,9 +135,14 @@ class TelemetryApp:
             f = self.active_frame()
             if f is None:
                 data = {"connected": False}
+                self.capture.state = None
             else:
                 data = f.to_dict()
                 data.update(self.recorder.update(f, dt))
+                moving = f.connected and not f.paused and f.speed > 5
+                self.capture.state = self.recorder.cur if moving and self.capture.enabled else None
+                if self.capture.enabled or self.capture.status["error"]:
+                    data["capture"] = self.capture.status
                 # tabuľka súperov je veľká – stačí 2× za sekundu (klienti si držia poslednú)
                 if data.get("standings") is not None:
                     if now - self.standings_sent < 0.5:
@@ -181,6 +196,88 @@ class TelemetryApp:
             for combo in self.held.pop(ws, {}).values():
                 keys.key_up(combo)  # pustí klávesy držané odpojeným mobilom
         return ws
+
+    # ---------- rozbor kôl a nahrávky ----------
+    def _lap_saved(self, lap, seq):
+        key = (lap["game"], lap["track"], lap["car"])
+        if self.capture.enabled:
+            keep = {self.recorder.ref["id"]} if self.recorder.ref else set()
+            cached = self.analysis.get(key)
+            if cached and cached[1]:
+                keep |= {s["best_lap"] for s in cached[1]["segments"]}
+            asyncio.get_running_loop().run_in_executor(None, self.capture.commit, lap, seq, keep)
+        else:
+            self.capture.discard(seq)
+        self._schedule_analysis(key)
+
+    def _schedule_analysis(self, key):
+        async def run():
+            try:
+                res = await self.analysis_for(*key)
+            except Exception:
+                log.exception("Rozbor kôl zlyhal")
+                return
+            if self.recorder.key == key:
+                self.recorder.theo = res
+                self.recorder.map_version += 1  # dashboard si znovu načíta mapu (brzdné body)
+        self.analysis_task = asyncio.ensure_future(run())
+
+    async def analysis_for(self, game, track, car):
+        key = (game, track, car)
+        sig = await asyncio.to_thread(self.store.combo_key, *key)
+        cached = self.analysis.get(key)
+        if cached and cached[0] == sig:
+            return cached[1]
+        laps = await asyncio.to_thread(self.store.laps_for, *key)
+        res = await asyncio.to_thread(analytics.analyse, laps)
+        self.analysis[key] = (sig, res)
+        return res
+
+    async def api_analysis(self, request):
+        q = request.query
+        if q.get("a"):
+            lap = await asyncio.to_thread(self.store.load, q["a"])
+            if not lap:
+                raise web.HTTPNotFound(text="Kolo nenájdené")
+            key = (lap["game"], lap["track"], lap["car"])
+        else:
+            key = (q.get("game", ""), q.get("track", ""), q.get("car", ""))
+        res = await self.analysis_for(*key)
+        if not res:
+            raise web.HTTPNotFound(text="Žiadne kolá")
+        vids = capture.list_ids()
+        sig = self.analysis[key][0]
+        return web.json_response({**res, "videos": [i for i in sig if i in vids]})
+
+    async def api_capture(self, request):
+        return web.json_response({**self.capture.status, "available": capture.available(),
+                                  "monitor": self.capture.monitor, "fps": self.capture.fps,
+                                  "width": self.capture.width, "monitors": await asyncio.to_thread(capture.monitors),
+                                  "size_mb": await asyncio.to_thread(capture.size_mb), "keep": capture.KEEP_VIDEOS,
+                                  "local": is_local(request)})
+
+    @local_only
+    async def api_capture_save(self, request):
+        body = await request.json()
+        cs = self.settings.setdefault("capture", {})
+        for k in ("on", "monitor", "fps", "width"):
+            if k in body:
+                cs[k] = bool(body[k]) if k == "on" else int(body[k])
+        save_settings(self.settings)
+        self.capture.configure(enabled=cs.get("on"), monitor=cs.get("monitor"), fps=cs.get("fps"), width=cs.get("width"))
+        return await self.api_capture(request)
+
+    async def api_video(self, request):
+        idx = await asyncio.to_thread(capture.index, request.match_info["id"])
+        if not idx:
+            raise web.HTTPNotFound(text="Toto kolo nemá nahraný obraz")
+        return web.json_response(idx)
+
+    async def api_video_frame(self, request):
+        p = capture.frame_path(request.match_info["id"], request.match_info["file"])
+        if not p:
+            raise web.HTTPNotFound()
+        return web.FileResponse(p, headers={"Cache-Control": "max-age=86400"})
 
     def _rumble(self, ws, large, small):
         """Vibrácie z hry -> mobil, ktorý práve ovláda volant."""
@@ -308,7 +405,11 @@ class TelemetryApp:
         return web.json_response({"ok": ok})
 
     async def api_laps(self, request):
-        return web.json_response(await asyncio.to_thread(self.store.list))
+        laps = await asyncio.to_thread(self.store.list)
+        vids = capture.list_ids()
+        for l in laps:
+            l["video"] = l["id"] in vids
+        return web.json_response(laps)
 
     async def api_lap(self, request):
         lap = await asyncio.to_thread(self.store.load, request.match_info["id"])
@@ -319,6 +420,7 @@ class TelemetryApp:
     @local_only
     async def api_lap_delete(self, request):
         ok = self.store.delete(request.match_info["id"])
+        capture.delete(request.match_info["id"])
         return web.json_response({"ok": ok})
 
     async def api_corners(self, request):
@@ -335,7 +437,9 @@ class TelemetryApp:
         return web.json_response({"corners": corners})
 
     async def api_map(self, request):
+        theo = self.recorder.theo
         return web.json_response({"points": self.recorder.map_points(),
+                                  "brakes": theo["brakes"] if theo else [],
                                   "version": self.recorder.map_version})
 
     def page(self, name):
@@ -358,6 +462,9 @@ class TelemetryApp:
         r.add_get("/analysis", self.page("analysis.html"))
         r.add_get("/wheel", self.page("wheel.html"))
         r.add_get("/display", self.page("display.html"))
+        r.add_get("/overlay", self.page("display.html"))
+        r.add_get("/progress", self.page("progress.html"))
+        r.add_get("/street", self.page("street.html"))
         r.add_get("/ws", self.ws_handler)
         r.add_get("/api/info", self.api_info)
         r.add_get("/api/update", self.api_update)
@@ -374,6 +481,11 @@ class TelemetryApp:
         r.add_delete("/api/laps/{id}", self.api_lap_delete)
         r.add_get("/api/map", self.api_map)
         r.add_get("/api/corners", self.api_corners)
+        r.add_get("/api/analysis", self.api_analysis)
+        r.add_get("/api/capture", self.api_capture)
+        r.add_post("/api/capture", self.api_capture_save)
+        r.add_get("/api/video/{id}", self.api_video)
+        r.add_get("/api/video/{id}/{file}", self.api_video_frame)
         r.add_static("/static/", WEB)
         return app
 
@@ -414,6 +526,7 @@ async def serve(port=None, open_browser=True, on_ready=None):
         await loop_task
     finally:
         pad_task.cancel()
+        tapp.capture.stop()
         tapp.pad.neutral()
         for task in tapp.tasks.values():
             task.cancel()

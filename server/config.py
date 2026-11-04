@@ -21,6 +21,7 @@ DEFAULT_SETTINGS = {
     "forza_port": 5300,
     "gt7_ip": "",
     "sources": {"ac": True, "r3e": True, "f1": True, "forza": True, "gt7": True, "demo": False},
+    "capture": {"on": False, "monitor": 1, "fps": 6, "width": 960},
 }
 
 

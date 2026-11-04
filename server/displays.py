@@ -12,7 +12,7 @@ from .config import DATA
 
 DISPLAYS_FILE = DATA / "displays.json"
 WIDGET_TYPES = {"gear", "value", "shift", "rpmbar", "delta", "pedals", "tyres", "map", "gforce", "flag",
-                "text", "button"}
+                "text", "button", "standings"}
 ID_RE = re.compile(r"^[a-z0-9_-]{1,40}$")
 MAX_WIDGETS = 150
 
@@ -20,6 +20,22 @@ MAX_WIDGETS = 150
 def _w(id_, type_, x, y, w, h, **o):
     return {"id": id_, "type": type_, "x": x, "y": y, "w": w, "h": h, "o": o}
 
+
+# rozloženie pre OBS (16:9, prvky v rohoch, stred voľný pre obraz hry); /overlay?l=stream
+STREAM = {
+    "name": "Stream (OBS)", "cols": 32, "rows": 18,
+    "widgets": [
+        _w("rpm", "rpmbar", 0, 11, 12, 1, text=False),
+        _w("gear", "gear", 0, 12, 4, 6),
+        _w("speed", "value", 4, 12, 5, 3, f="speed", label="km/h"),
+        _w("lapt", "value", 4, 15, 5, 3, f="lap_time", label="Kolo"),
+        _w("pedals", "pedals", 9, 12, 3, 6),
+        _w("delta", "delta", 12, 15, 6, 3),
+        _w("pred", "value", 18, 15, 5, 3, f="predicted", label="Predpoveď"),
+        _w("pos", "value", 0, 0, 3, 3, f="position", label="Poz."),
+        _w("stand", "standings", 25, 0, 7, 9),
+    ],
+}
 
 DEFAULT_DISPLAYS = {
     "palubovka": {
@@ -75,10 +91,13 @@ def load():
         try:
             data = json.loads(DISPLAYS_FILE.read_text(encoding="utf-8"))
             if isinstance(data.get("layouts"), dict):
+                if not data.get("stream_added"):  # nové predvolené rozloženie pre OBS (pridá sa raz)
+                    data["layouts"].setdefault("stream", copy.deepcopy(STREAM))
+                    data["stream_added"] = True
                 return data
         except ValueError:
             pass
-    return {"layouts": copy.deepcopy(DEFAULT_DISPLAYS)}
+    return {"layouts": {**copy.deepcopy(DEFAULT_DISPLAYS), "stream": copy.deepcopy(STREAM)}, "stream_added": True}
 
 
 def save(data):

@@ -99,3 +99,9 @@ a.btn { text-decoration: none; display: inline-block; }
 #engBtn.on { border-color: var(--green); color: var(--green); }
 .check { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
 .modal input[type=range] { width: 100%; }
+#recBtn.on { border-color: var(--red); color: var(--red); }
+.mono.faster { color: var(--green); } .mono.slower { color: var(--red); }
+.fuel h3 { display: flex; align-items: center; justify-content: space-between; }
+.fuel h3 .btn { text-transform: none; letter-spacing: 0; }
+.row2i { display: flex; gap: 6px; align-items: center; } .row2i input { width: 100%; min-width: 0; }
+[hidden] { display: none !important; }

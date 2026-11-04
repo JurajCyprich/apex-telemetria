@@ -33,6 +33,9 @@ const FIELDS = {
   lap_no: { g: "Časy", label: "Kolo", get: (d) => (d.lap === undefined ? null : d.total_laps ? `${d.lap + 1}/${d.total_laps}` : d.lap + 1) },
   position: { g: "Časy", label: "Pozícia", get: (d) => d.position || null, d: 0 },
   lap_dist: { g: "Časy", label: "Vzdialenosť v kole", unit: "m", d: 0, get: (d) => (d.lap_dist >= 0 ? d.lap_dist : null) },
+  predicted: { g: "Časy", label: "Predpoveď kola", fmt: fmtTime },
+  theo_time: { g: "Časy", label: "Teoretické najlepšie", fmt: fmtTime },
+  avg_lap: { g: "Časy", label: "Priemer posledných 3 kôl", fmt: fmtTime },
   gap_ahead: { g: "Súperi", label: "Odstup pred tebou", unit: "s", d: 2 },
   gap_behind: { g: "Súperi", label: "Odstup za tebou", unit: "s", d: 2 },
   corner_speed: { g: "Zákruty", label: "Rýchlosť ďalšej zákruty", unit: "km/h", d: 0, get: (d) => d.corner?.speed ?? null },
@@ -844,6 +847,18 @@ function showProps() {
 
 addEventListener("beforeunload", (e) => { if (editing && dirty) e.preventDefault(); });
 addEventListener("resize", () => { if (editing) sizeGridOverlay(); });
+
+// ---------- OBS overlay: /overlay?l=<id> – priehľadné pozadie, bez lišty ----------
+const OVERLAY = location.pathname === "/overlay";
+if (OVERLAY) {
+  document.body.classList.add("overlay");
+  document.documentElement.classList.add("overlay");
+}
+$("obsBtn").addEventListener("click", async () => {
+  const url = `${location.origin}/overlay?l=${encodeURIComponent(currentId || "")}`;
+  try { await navigator.clipboard.writeText(url); toast(`Adresa pre OBS skopírovaná: ${url}`); }
+  catch { prompt("Adresa pre OBS (Zdroj → Prehliadač):", url); }
+});
 
 // ---------- štart ----------
 setupFullscreen($("fs"));

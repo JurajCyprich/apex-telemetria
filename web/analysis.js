@@ -35,7 +35,7 @@ function renderList() {
     items.sort((a, b) => a.time - b.time);
     return `<div class="group"><div class="group-title">${esc(track)}<small>${esc(game)} · ${esc(car)}</small></div>
       ${items.map((l) => `<div class="lap ${lapA?.id === l.id ? "a" : ""} ${lapB?.id === l.id ? "b" : ""}" data-id="${l.id}">
-        <span class="time">${fmtTime(l.time)}</span>${l.time === best ? '<span class="best">★ najlepšie</span>' : ""}
+        <span class="time">${fmtTime(l.time)}</span>${l.time === best ? '<span class="best">★ najlepšie</span>' : ""}${l.video ? '<span class="vid" title="Má nahraný obraz – street view">🎥</span>' : ""}
         <span class="date">${new Date(l.date).toLocaleString("sk-SK", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
         <button class="btn small bbtn" data-b="1" title="Porovnať ako B">B</button>
         <button class="btn small del" data-del="1" title="Zmazať">✕</button></div>`).join("")}</div>`;
@@ -85,11 +85,69 @@ function deltaSeries(a, b) {
 
 function draw() {
   drawSummary();
+  drawTheo();
   drawCorners();
   drawCharts();
   drawMap();
   drawReadout();
 }
+
+// ---------- teoretické najlepšie kolo, najlepšie brzdné body, najrýchlejšia stopa ----------
+let theo = { key: null, data: null };
+async function drawTheo() {
+  const card = $("theoCard");
+  if (!lapA) { card.hidden = true; theo = { key: null, data: null }; return; }
+  const key = `${lapA.game}|${lapA.track}|${lapA.car}|${laps.length}`;
+  if (theo.key !== key) {
+    theo = { key, data: null };
+    try {
+      const r = await getJSON(`/api/analysis?a=${lapA.id}`);
+      if (theo.key !== key) return;
+      theo.data = r;
+    } catch { theo.data = null; }
+    drawMap();
+  }
+  const t = theo.data;
+  $("streetLink").hidden = !lapA.channels || !laps.find((l) => l.id === lapA.id)?.video;
+  $("streetLink").href = `/street?a=${lapA.id}${lapB ? `&b=${lapB.id}` : ""}`;
+  card.hidden = !t;
+  if (!t) return;
+  const lapLabel = (id) => {
+    const l = laps.find((x) => x.id === id);
+    if (!l) return "?";
+    const when = new Date(l.date).toLocaleString("sk-SK", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
+    return id === lapA.id ? `<span class="me">kolo A</span>` : `<a data-pick="${id}" title="Porovnať ako kolo B">${fmtTime(l.time)} · ${when}</a>`;
+  };
+  $("theoHint").textContent = `· z ${t.laps} ${t.laps === 1 ? "kola" : t.laps < 5 ? "kôl" : "kôl"} s týmto autom`;
+  const vsA = lapA.time - t.time;
+  $("theoSum").innerHTML = `
+    <div><small>Teoretické najlepšie</small><b class="purple">${fmtTime(t.time)}</b></div>
+    <div><small>Najlepšie odjazdené</small><b>${fmtTime(t.ref_time)}</b></div>
+    <div><small>Rezerva oproti najlepšiemu</small><b style="color:var(--green)">${t.gain > 0 ? "−" : ""}${t.gain.toFixed(3)} s</b></div>
+    <div><small>Rezerva kola A</small><b>${vsA.toFixed(3)} s</b></div>`;
+  // čas kola A v jednotlivých úsekoch
+  const at = (d) => interp(lapA.channels.d, lapA.channels.t, d);
+  const rows = t.segments.map((s) => {
+    const mine = at(s.end) - at(s.start);
+    const loss = mine - s.best;
+    return `<tr data-d="${(s.start + s.end) / 2}"><td>${s.i + 1}</td><td>${s.corner ? `zákruta ${s.corner}` : "štart / cieľ"}</td>
+      <td class="purple">${s.best.toFixed(3)}</td><td class="ca">${mine.toFixed(3)}</td>
+      <td class="${loss > 0.02 ? "slower" : ""}">${loss > 0.0005 ? `+${loss.toFixed(3)}` : "✓"}</td>
+      <td class="from">${lapLabel(s.best_lap)}</td></tr>`;
+  });
+  $("theoTable").innerHTML = `<table class="ctab"><tr><th>Úsek</th><th style="text-align:left">Kde</th><th>Najlepší</th><th class="ca">Kolo A</th><th>Strata A</th><th style="text-align:left">Najlepší úsek z kola</th></tr>${rows.join("")}</table>`;
+}
+$("theoTable").addEventListener("click", async (e) => {
+  const pick = e.target.closest("[data-pick]");
+  if (pick) {
+    lapB = await getJSON(`/api/laps/${pick.dataset.pick}`);
+    renderList(); draw();
+    return;
+  }
+  const tr = e.target.closest("tr[data-d]");
+  if (tr) { hoverD = +tr.dataset.d; drawCharts(); drawMap(); drawReadout(); }
+});
+["mBest", "mLine", "mBrakes"].forEach((id) => $(id).addEventListener("change", drawMap));
 
 // ---------- zákruty: kde kolo B stráca / získava oproti kolu A ----------
 let corners = { key: null, list: [] };
@@ -214,13 +272,25 @@ function drawCharts() {
   }
 }
 
+let mapProject = null;
 function drawMap() {
   const { ctx, w, h } = setupCanvas($("map"));
   ctx.clearRect(0, 0, w, h);
+  mapProject = null;
   if (!lapA) return;
   const pts = lapA.channels.x.map((x, i) => [x, lapA.channels.z[i]]);
   const project = drawTrack(ctx, w, h, pts, { width: 11 });
   if (!project) return;
+  mapProject = project;
+  const t = theo.data;
+  if (t && $("mLine").checked && t.line.length > 2) {
+    ctx.save();
+    ctx.setLineDash([5, 4]); ctx.strokeStyle = "#bf5af2"; ctx.lineWidth = 2;
+    ctx.beginPath();
+    t.line.forEach(([, x, z], i) => { const [px, py] = project(x, z); i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); });
+    ctx.stroke();
+    ctx.restore();
+  }
   // úseky, kde je B rýchlejšie (zelené) / pomalšie (červené)
   if (lapB) {
     const delta = deltaSeries(lapA, lapB);
@@ -233,12 +303,30 @@ function drawMap() {
       ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
     }
   }
-  // brzdné body kola A
-  ctx.fillStyle = "#ff453a";
-  const br = lapA.channels.brake;
-  for (let i = 1; i < br.length; i++) {
-    if (br[i] > 0.3 && br[i - 1] <= 0.3) {
-      const [px, py] = project(...pts[i]); ctx.beginPath(); ctx.arc(px, py, 3, 0, Math.PI * 2); ctx.fill();
+  // brzdné body kola A (modrý okraj) a B (oranžový)
+  if ($("mBrakes").checked) {
+    for (const [lap, ring] of [[lapA, COLOR_A], [lapB, COLOR_B]]) {
+      if (!lap) continue;
+      const c = lap.channels, br = c.brake;
+      for (let i = 1; i < br.length; i++) {
+        if (br[i] > 0.3 && br[i - 1] <= 0.3) {
+          const [px, py] = project(c.x[i], c.z[i]);
+          ctx.fillStyle = "#ff453a"; ctx.strokeStyle = ring; ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.arc(px, py, 3.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        }
+      }
+    }
+  }
+  // najlepšie brzdné body: kde brzdilo kolo, ktoré danou zákrutou prešlo najrýchlejšie
+  if (t && $("mBest").checked) {
+    ctx.font = "bold 11px sans-serif"; ctx.textAlign = "left";
+    for (const b of t.brakes) {
+      const [px, py] = project(b.x, b.z);
+      ctx.fillStyle = "#bf5af2"; ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(px, py, 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.fillText(b.n, px, py + 4);
+      ctx.textAlign = "left"; ctx.fillStyle = "#e3c4ff";
+      ctx.fillText(`${b.speed} km/h`, px + 9, py - 6);
     }
   }
   if (hoverD !== null) {
@@ -275,7 +363,21 @@ $("charts").addEventListener("mousemove", (e) => {
   hoverD = Math.max(0, Math.min(maxD, ((x - left) / (w - left - right)) * maxD));
   requestAnimationFrame(() => { drawCharts(); drawMap(); drawReadout(); });
 });
-$("charts").addEventListener("mouseleave", () => { hoverD = null; draw(); });
+$("charts").addEventListener("mouseleave", () => { hoverD = null; drawCharts(); drawMap(); drawReadout(); });
+// klik na mapu -> najbližší bod kola A
+$("map").addEventListener("click", (e) => {
+  if (!lapA || !mapProject) return;
+  const rect = e.target.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  const c = lapA.channels;
+  let best = Infinity, bd = null;
+  for (let i = 0; i < c.d.length; i += 2) {
+    const [px, py] = mapProject(c.x[i], c.z[i]);
+    const dd = (px - mx) ** 2 + (py - my) ** 2;
+    if (dd < best) { best = dd; bd = c.d[i]; }
+  }
+  if (bd !== null && best < 900) { hoverD = bd; drawCharts(); drawMap(); drawReadout(); }
+});
 window.addEventListener("resize", draw);
 
 loadList().catch((e) => toast(e.message));

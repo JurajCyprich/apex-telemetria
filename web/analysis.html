@@ -19,6 +19,8 @@
   <nav class="tabs">
     <a href="/">Živé dáta</a>
     <a href="/analysis" class="active">Analýza kôl</a>
+    <a href="/street">Street view</a>
+    <a href="/progress">Pokrok</a>
     <a href="/display">Displej</a>
     <a href="/buttonbox">Button box</a>
   </nav>
@@ -34,9 +36,21 @@
   </aside>
   <section class="main">
     <div class="card summary" id="summary"><span class="muted">Vyber kolo zo zoznamu vľavo.</span></div>
+    <div class="card theo" id="theoCard" hidden>
+      <h3>Teoretické najlepšie kolo <span class="muted" id="theoHint"></span></h3>
+      <div class="theo-sum" id="theoSum"></div>
+      <div id="theoTable"></div>
+    </div>
     <div class="card corners" id="cornersCard" hidden><h3>Zákruty <span class="muted" id="cornersHint"></span></h3><div id="cornersTable"></div></div>
     <div class="row2">
-      <div class="card"><h3>Trať</h3><canvas id="map"></canvas></div>
+      <div class="card"><h3>Trať <span class="muted small">· klikni na mapu = skok na to miesto</span></h3>
+        <div class="maplegend">
+          <label><input type="checkbox" id="mBest" checked> <i class="lg purple"></i> Najlepšie brzdenie</label>
+          <label><input type="checkbox" id="mLine"> <i class="lg dash"></i> Najrýchlejšia stopa</label>
+          <label><input type="checkbox" id="mBrakes" checked> <i class="lg red"></i> Brzdenie A / B</label>
+          <a class="btn small" id="streetLink" hidden>🎥 Street view</a>
+        </div>
+        <canvas id="map"></canvas></div>
       <div class="card readout" id="readout"><h3>Hodnoty na kurzore</h3><div id="readVals" class="muted">Prejdi myšou nad grafy.</div></div>
     </div>
     <div class="card"><canvas id="charts"></canvas></div>

@@ -201,6 +201,22 @@ class LapStore:
         out.sort(key=lambda x: x.get("date") or "", reverse=True)
         return out
 
+    def laps_for(self, game, track, car):
+        """Všetky kolá s kanálmi pre jednu kombináciu hra/trať/auto."""
+        d = self._dir(game, track, car)
+        out = []
+        for p in d.glob("*.json") if d.exists() else []:
+            try:
+                out.append(json.loads(p.read_text(encoding="utf-8")))
+            except (OSError, ValueError):
+                continue
+        return out
+
+    def combo_key(self, game, track, car):
+        """Podpis kombinácie – mení sa, keď pribudne alebo zmizne kolo (na cache rozborov)."""
+        d = self._dir(game, track, car)
+        return tuple(sorted(p.stem for p in d.glob("*.json"))) if d.exists() else ()
+
     def best(self, game, track, car):
         best = None
         d = self._dir(game, track, car)
@@ -220,6 +236,12 @@ class LapRecorder:
         self.key = None
         self.on_lap = None  # callback(lap_summary)
         self.on_corner = None  # callback(corner_stats) – po výjazde zo zákruty, porovnanie s najlepším kolom
+        self.on_saved = None   # callback(lap, seq) – kolo uložené (nahrávanie obrazu si ho priradí)
+        self.on_discard = None  # callback(seq) – kolo sa neuložilo
+        self.on_session = None  # callback(key) – iná hra/trať/auto
+        self.seq = 0           # poradové číslo práve jazdeného kola (aj neuložených)
+        self.cur = None        # (seq, vzdialenosť, čas kola) pri poslednom rámci
+        self.theo = None       # teoretické najlepšie kolo (dopočítava aplikácia na pozadí)
         self._reset_session()
 
     def _reset_session(self):
@@ -227,6 +249,9 @@ class LapRecorder:
         self._corners = (None, [])  # (id referenčného kola, zákruty)
         self.session_best = 0.0
         self.fuel_used = []
+        self.wear_used = []    # [[FL, FR, RL, RR] % opotrebenia za kolo]
+        self.lap_times = []    # časy celých kôl v tejto relácii (aj neuložených)
+        self.theo = None
         self.map_version = 0
         self._reset_lap(None)
         self.last_lap_count = None
@@ -239,6 +264,15 @@ class LapRecorder:
         self.dist = 0.0
         self.timer = 0.0
         self.fuel_start = frame.fuel if frame is not None else None
+        self.wear_start = list(frame.tyre_wear) if frame is not None else None
+        self.seq += 1
+
+    def wear_per_lap(self):
+        """Priemerné opotrebenie pneumatík za kolo (posledné 3 kolá), [FL, FR, RL, RR] v %."""
+        last = self.wear_used[-3:]
+        if not last:
+            return None
+        return [round(sum(w[i] for w in last) / len(last), 2) for i in range(4)]
 
     def map_points(self):
         src = self.ref["channels"] if self.ref else self.samples
@@ -269,7 +303,10 @@ class LapRecorder:
     def update(self, f, dt):
         """Spracuje rámec, vráti doplnkové údaje (delta, palivo...)."""
         extra = {"delta": None, "corner": None, "ref_time": self.ref["time"] if self.ref else None,
-                 "session_best": self.session_best or None,
+                 "session_best": self.session_best or None, "predicted": None,
+                 "theo_time": self.theo["time"] if self.theo else None,
+                 "avg_lap": round(sum(self.lap_times[-3:]) / len(self.lap_times[-3:]), 3) if self.lap_times else None,
+                 "wear_per_lap": self.wear_per_lap(), "laps_done": len(self.lap_times),
                  "fuel_per_lap": None, "fuel_laps_left": None, "map_version": self.map_version}
         if self.fuel_used:
             per_lap = sum(self.fuel_used[-5:]) / len(self.fuel_used[-5:])
@@ -285,6 +322,8 @@ class LapRecorder:
             self._reset_session()
             self.ref = self.store.best(*key)
             self.map_version = int(time.time() * 1000) % 1_000_000_000
+            if self.on_session:
+                self.on_session(key)
             extra["map_version"] = self.map_version
             extra["ref_time"] = self.ref["time"] if self.ref else None
 
@@ -299,7 +338,8 @@ class LapRecorder:
             self._reset_lap(f, valid_start=near_start)
         elif f.lap > self.last_lap_count:
             measured = self.samples["t"][-1] if self.samples["t"] else 0.0
-            self.pending = {"samples": self.samples, "valid": self.valid_start,
+            self.pending = {"samples": self.samples, "valid": self.valid_start, "seq": self.seq,
+                            "wear_start": self.wear_start, "wear_end": list(f.tyre_wear),
                             "measured": measured, "fuel_start": self.fuel_start,
                             "lap": self.last_lap_count + 1, "fuel_end": f.fuel,
                             "track_length": f.track_length, "at": time.monotonic() + 0.6}
@@ -317,6 +357,7 @@ class LapRecorder:
             self.dist += f.speed / 3.6 * dt
             d = self.dist
         lap_t = f.lap_time if f.lap_time > 0 else self.timer
+        self.cur = (self.seq, d, lap_t)
         s = self.samples
         if not s["d"] or d - s["d"][-1] >= 1.0:
             if s["d"] and d < s["d"][-1] - 200:
@@ -332,6 +373,8 @@ class LapRecorder:
                 frac = (d - rd[i - 1]) / max(1e-6, rd[i] - rd[i - 1])
                 ref_t = rt[i - 1] + frac * (rt[i] - rt[i - 1])
                 extra["delta"] = round(lap_t - ref_t, 3)
+                if d > 200:  # na začiatku kola je predpoveď ešte nespoľahlivá
+                    extra["predicted"] = round(self.ref["time"] + extra["delta"], 3)
             extra["corner"] = self.next_corner(d)
             self._coach(d)
         return extra
@@ -365,8 +408,17 @@ class LapRecorder:
         n = len(s["d"])
         span = s["d"][-1] - s["d"][0] if n else 0
         full = span > 0.9 * p["track_length"] if p["track_length"] else span > 300
+        if full and lap_time > 10:
+            self.lap_times.append(lap_time)
+            ws, we = p.get("wear_start"), p.get("wear_end")
+            if ws and we and all(v is not None for v in ws + we):
+                used = [a - b for a, b in zip(ws, we)]
+                if all(-0.5 <= u < 30 for u in used):  # nové gumy v boxoch = záporné, to nepočítame
+                    self.wear_used.append([max(0.0, u) for u in used])
         if not (p["valid"] and full and lap_time > 10 and n > 50):
             log.info("Kolo %d nezaznamenané (neúplné)", p["lap"])
+            if self.on_discard:
+                self.on_discard(p["seq"])
             return
         if not self.session_best or lap_time < self.session_best:
             self.session_best = lap_time
@@ -377,6 +429,8 @@ class LapRecorder:
                "track_length": p["track_length"], "channels": s}
         self.store.save(lap)
         log.info("Uložené kolo %d: %.3f s", p["lap"], lap_time)
+        if self.on_saved:
+            self.on_saved(lap, p["seq"])
         if self.ref is None or lap_time < self.ref["time"]:
             self.ref = lap
             self.map_version += 1

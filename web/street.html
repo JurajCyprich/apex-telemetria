@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0b0d12">
+<title>Street view</title>
+<link rel="stylesheet" href="/static/common.css">
+<link rel="stylesheet" href="/static/street.css">
+</head>
+<body>
+<header class="top">
+  <div class="logo">APEX<span>/</span>TELEMETRIA</div>
+  <nav class="tabs">
+    <a href="/">Živé dáta</a>
+    <a href="/analysis">Analýza kôl</a>
+    <a href="/street" class="active">Street view</a>
+    <a href="/progress">Pokrok</a>
+    <a href="/display">Displej</a>
+    <a href="/buttonbox">Button box</a>
+  </nav>
+  <div class="status"></div>
+  <button class="btn" id="fs">⛶ Celá obrazovka</button>
+</header>
+
+<div class="toolbar">
+  <label>Kolo <select id="selA"></select></label>
+  <label>porovnať s <select id="selB"></select></label>
+  <span class="sep"></span>
+  <button class="btn" id="play" title="Medzerník">▶ Prehrať</button>
+  <select id="rate" title="Rýchlosť prehrávania">
+    <option value="0.25">0,25×</option><option value="0.5">0,5×</option><option value="1" selected>1×</option><option value="2">2×</option>
+  </select>
+  <button class="btn small" id="swap" title="Prehodiť veľký a malý obraz">⇄ Obraz B</button>
+  <span class="muted small hint">← → krok 5 m · Shift = 50 m · koliesko myši · klik do mapy</span>
+</div>
+
+<main class="sv">
+  <section class="viewer" id="viewer">
+    <img id="imgMain" alt="">
+    <canvas id="bigZoom" hidden></canvas>
+    <div class="novideo" id="noVideo" hidden>
+      <b>Toto kolo nemá nahraný obraz.</b>
+      <span>Zapni na dashboarde <b>🎥 Obraz</b> a odjazdi kolo – potom tu uvidíš, čo si videl za volantom.
+        Stopu, brzdenie a rýchlosť vidíš aj bez obrazu.</span>
+    </div>
+    <div class="pip" id="pip" hidden><img id="imgPip" alt=""><span id="pipLbl">B</span></div>
+    <div class="hud">
+      <div class="hud-l">
+        <div class="spd"><b class="mono" id="hSpeed">–</b><small>km/h</small></div>
+        <div class="gear mono" id="hGear">–</div>
+        <div class="pd"><i><b id="hThr"></b></i><i><b id="hBrk"></b></i></div>
+      </div>
+      <div class="hud-r">
+        <div class="delta mono" id="hDelta"></div>
+        <div class="dv mono" id="hDv"></div>
+      </div>
+    </div>
+    <div class="callout" id="callout" hidden></div>
+    <div class="where mono" id="hWhere"></div>
+  </section>
+
+  <aside class="side">
+    <div class="card">
+      <h3>Trať <span class="muted" id="speedLegend"></span></h3>
+      <canvas id="map"></canvas>
+      <div class="legend">
+        <span><i class="lg grad"></i> rýchlosť kola A</span>
+        <span><i class="lg dot purple"></i> najlepšie brzdenie</span>
+        <span><i class="lg dot red"></i> tvoje brzdenie</span>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Stopa zblízka <span class="muted">· smer jazdy hore</span></h3>
+      <canvas id="zoom"></canvas>
+      <div class="legend">
+        <span><i class="lg line blue"></i> kolo A</span>
+        <span><i class="lg line orange"></i> kolo B</span>
+        <span><i class="lg line dash"></i> najrýchlejšia stopa</span>
+      </div>
+      <div class="offsets" id="offsets"></div>
+    </div>
+    <div class="card" id="readCard"><div id="read"></div></div>
+  </aside>
+
+  <section class="card timeline">
+    <canvas id="tl"></canvas>
+  </section>
+</main>
+
+<script src="/static/common.js"></script>
+<script src="/static/street.js"></script>
+</body>
+</html>

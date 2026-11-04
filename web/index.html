@@ -19,10 +19,13 @@
   <nav class="tabs">
     <a href="/" class="active">Živé dáta</a>
     <a href="/analysis">Analýza kôl</a>
+    <a href="/street">Street view</a>
+    <a href="/progress">Pokrok</a>
     <a href="/display">Displej</a>
     <a href="/buttonbox">Button box</a>
   </nav>
   <div class="status"><span class="dot" id="dot"></span><span id="status">Čakám na hru…</span></div>
+  <button class="btn" id="recBtn" title="Nahrávanie obrazu kôl pre street view">🎥 Obraz</button>
   <button class="btn" id="engBtn">🔈 Inžinier</button>
   <button class="btn" id="phoneBtn">📱 Mobil</button>
   <button class="btn" id="settingsBtn">⚙ Nastavenia</button>
@@ -46,6 +49,8 @@
     <div class="row"><span class="muted">Posledné</span><span class="mono" id="lastLap">-:--.---</span></div>
     <div class="row"><span class="muted">Najlepšie (hra)</span><span class="mono" id="bestLap">-:--.---</span></div>
     <div class="row"><span class="muted">Referencia (uložené)</span><span class="mono purple" id="refLap">-:--.---</span></div>
+    <div class="row"><span class="muted">Predpoveď kola</span><span class="mono" id="predLap">-:--.---</span></div>
+    <div class="row"><span class="muted" title="Súčet tvojich najlepších úsekov z rôznych kôl">Teoretické najlepšie</span><span class="mono purple" id="theoLap">-:--.---</span></div>
     <div class="row"><span class="muted">Kolo</span><span class="mono" id="lap">–</span></div>
     <div class="row"><span class="muted">Pozícia</span><span class="mono" id="pos">–</span></div>
     <div class="row"><span class="muted">Pred tebou / za tebou</span><span class="mono" id="gaps">–</span></div>
@@ -90,11 +95,15 @@
   </section>
 
   <section class="card fuel">
-    <h3>Palivo</h3>
+    <h3>Palivo a stratégia <button class="btn small" id="stratBtn">🏁 Nastaviť</button></h3>
     <div class="fuelbig mono"><span id="fuel">–</span><small id="fuelUnit">l</small></div>
     <div class="fuelbar"><div id="fuelFill"></div></div>
     <div class="row"><span class="muted">Spotreba / kolo</span><span class="mono" id="fuelLap">–</span></div>
     <div class="row"><span class="muted">Vydrží na kôl</span><span class="mono" id="fuelLeft">–</span></div>
+    <div class="row"><span class="muted">Do cieľa zostáva</span><span class="mono" id="stLaps">–</span></div>
+    <div class="row"><span class="muted">Palivo do cieľa</span><span class="mono" id="stFuel">–</span></div>
+    <div class="row"><span class="muted">Gumy vydržia</span><span class="mono" id="stTyres">–</span></div>
+    <div class="row"><span class="muted">Zastávka v boxoch</span><span class="mono" id="stPit">–</span></div>
   </section>
 
   <section class="card map">
@@ -165,6 +174,52 @@
   </div>
 </div>
 
+<div class="modal-bg" id="stratModal">
+  <div class="modal">
+    <h2>🏁 Stratégia na preteky</h2>
+    <p class="muted">Spotreba paliva a opotrebenie gúm sa merajú z tvojich kôl (po 1. celom kole). Inžinier ti potom povie, kedy ísť do boxov.</p>
+    <div class="field"><label>Dĺžka pretekov</label>
+      <select id="stMode">
+        <option value="auto">Podľa hry (počet kôl, ak ho hra posiela)</option>
+        <option value="laps">Zadám počet kôl</option>
+        <option value="minutes">Zadám dĺžku v minútach</option>
+      </select></div>
+    <div class="cols">
+      <div class="field" id="stLapsF"><label>Počet kôl</label><input type="number" id="stLapsIn" min="1" max="500"></div>
+      <div class="field" id="stMinF"><label>Dĺžka v minútach</label><input type="number" id="stMinIn" min="1" max="1440"></div>
+    </div>
+    <div id="stStartRow"><button class="btn" id="stStart">▶ Preteky práve začali (spustiť odpočet)</button>
+      <span class="muted small" id="stStartInfo"></span></div>
+    <div class="cols">
+      <div class="field"><label>Rezerva paliva (kolá)</label><input type="number" id="stReserve" min="0" max="5" step="0.5"></div>
+      <div class="field"><label>Vymeniť gumy, keď zostáva (%)</label><input type="number" id="stWear" min="0" max="95" step="5"></div>
+    </div>
+    <div class="actions"><button class="btn primary" data-close>Hotovo</button></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="recModal">
+  <div class="modal">
+    <h2>🎥 Nahrávanie obrazu kôl</h2>
+    <p class="muted">Počas jazdy sa robia snímky obrazovky a každá sa označí miestom na trati. Po kole si ho pozrieš
+      v <a href="/street">Street view</a> – prechádzaš trať ako v Google Maps a vidíš svoju stopu, brzdenie a rýchlosť
+      oproti najlepšiemu kolu.</p>
+    <label class="check"><input type="checkbox" id="recOn"> <b>Nahrávať obraz každého kola</b></label>
+    <div class="cols">
+      <div class="field"><label>Monitor s hrou</label><select id="recMon"></select></div>
+      <div class="field"><label>Snímok za sekundu</label>
+        <select id="recFps"><option value="4">4 (najmenej miesta)</option><option value="6">6</option><option value="10">10</option><option value="15">15 (plynulé, viac CPU)</option></select></div>
+      <div class="field"><label>Šírka snímky</label>
+        <select id="recWidth"><option value="640">640 px</option><option value="960">960 px</option><option value="1280">1280 px</option><option value="1920">1920 px</option></select></div>
+    </div>
+    <p class="warn small" id="recWarn" hidden></p>
+    <p class="muted small" id="recInfo"></p>
+    <p class="muted small">Hru prepni na <b>okno bez okraja (borderless)</b> – exkluzívna celá obrazovka sa často nedá zachytiť (snímky budú čierne).
+      Ukladá sa obraz posledných kôl a tvoje najlepšie kolá, staršie sa mažú samé.</p>
+    <div class="actions"><button class="btn primary" data-close>Hotovo</button></div>
+  </div>
+</div>
+
 <div class="modal-bg" id="engModal">
   <div class="modal">
     <h2>🔊 Hlasový inžinier</h2>
@@ -199,6 +254,16 @@
     <div class="field"><label>Hodnotiť, až keď je rozdiel aspoň</label>
       <select id="engCoachMin"><option value="0.05">0,05 s</option><option value="0.1">0,1 s</option><option value="0.2">0,2 s</option><option value="0.3">0,3 s</option></select></div>
     <label class="check"><input type="checkbox" id="eng_gaps"> Odstupy od súperov po každom kole (F1, ACC, RaceRoom)</label>
+    <label class="check"><input type="checkbox" id="eng_strategy"> Stratégia – kedy do boxov, či vystačí palivo (nastavíš v 🏁 pri palive)</label>
+    <label class="check"><input type="checkbox" id="eng_tyres"> Pneumatiky a brzdy – studené, prehriate gumy, zlý tlak, prehriate brzdy</label>
+    <div class="cols">
+      <div class="field"><label>Optimálna teplota gúm (°C)</label>
+        <div class="row2i"><input type="number" id="engTyreLo" min="0" max="200"> – <input type="number" id="engTyreHi" min="0" max="200"></div></div>
+      <div class="field"><label>Optimálny tlak (psi, 0 = nehlásiť)</label>
+        <div class="row2i"><input type="number" id="engPressLo" min="0" max="60" step="0.1"> – <input type="number" id="engPressHi" min="0" max="60" step="0.1"></div></div>
+      <div class="field"><label>Brzdy prehriate nad (°C)</label><input type="number" id="engBrakeHot" min="100" max="1500" step="50"></div>
+    </div>
+    <p class="muted small">Tip: GT3 v ACC – gumy 80–95 °C, tlak 26–27,5 psi. F1 – gumy 90–110 °C. Hodnoty sa líšia podľa hry a auta.</p>
     <p class="muted small">Zákruty sa nájdu v najlepšom uloženom kole na danej trati s daným autom – kým ho nemáš, hlásenie mlčí.</p>
     <div class="actions">
       <button class="btn" id="engTest">▶ Vyskúšať hlas</button>
@@ -209,6 +274,7 @@
 </div>
 
 <script src="/static/common.js"></script>
+<script src="/static/strategy.js"></script>
 <script src="/static/engineer.js"></script>
 <script src="/static/dashboard.js"></script>
 </body>

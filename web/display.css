@@ -125,6 +125,11 @@ body.editing .wd .in > * { pointer-events: none; }
 .types b { display: block; font-size: 14px; } .types small { color: var(--muted); }
 .actions { display: flex; justify-content: flex-end; margin-top: 12px; }
 
+/* OBS overlay: priehľadné pozadie, panely polopriehľadné */
+html.overlay, body.overlay, body.overlay .board { background: transparent !important; }
+body.overlay .bar, body.overlay .toast { display: none !important; }
+body.overlay .wd.bg .in { background: #0b0d12b3; border-color: #ffffff14; }
+
 /* súperi */
 .stand { width: 100%; height: 100%; display: flex; flex-direction: column; padding: 3%; gap: 2px;
   font-size: min(calc(62cqh / var(--rows, 7)), 6.5cqw); }

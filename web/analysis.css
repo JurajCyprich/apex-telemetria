@@ -38,4 +38,22 @@
 .ctab tr.sum td { border-bottom: 0; color: var(--muted); }
 .ctab small { font-size: 11px; }
 .ctab .faster, .ctab small.faster { color: var(--green); } .ctab .slower, .ctab small.slower { color: var(--red); }
-.corners[hidden] { display: none; }
+.corners[hidden], .theo[hidden] { display: none; }
+.theo-sum { display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 10px; }
+.theo-sum div { display: flex; flex-direction: column; }
+.theo-sum small { color: var(--muted); font-size: 11px; }
+.theo-sum b { font-family: var(--mono); font-size: 20px; }
+.theo-sum b.purple { color: var(--purple); }
+.ctab td.from { font-family: inherit; color: var(--muted); font-size: 12px; }
+.ctab td.from a { cursor: pointer; color: var(--orange); text-decoration: underline dotted; }
+.ctab td.from .me { color: var(--blue); }
+.maplegend { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; font-size: 12px; color: var(--muted); margin: -4px 0 6px; }
+.maplegend label { display: flex; gap: 5px; align-items: center; cursor: pointer; }
+.maplegend .btn { margin-left: auto; text-decoration: none; }
+.lg { display: inline-block; width: 14px; height: 4px; border-radius: 2px; }
+.lg.purple { background: var(--purple); height: 10px; width: 10px; border-radius: 50%; }
+.lg.red { background: var(--red); height: 8px; width: 8px; border-radius: 50%; }
+.lg.dash { background: repeating-linear-gradient(90deg, var(--purple) 0 4px, transparent 4px 7px); }
+#map { cursor: pointer; }
+.small { font-size: 12px; }
+.lap .vid { font-size: 11px; }

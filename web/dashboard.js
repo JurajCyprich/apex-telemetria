@@ -51,17 +51,31 @@ function drawTrace() {
 
 // ---------- mapa trate ----------
 let mapPoints = [];
+let mapBrakes = [];
 let mapVersion = null;
 let trail = [];
 let lastPos = null;
 async function loadMap() {
-  try { const m = await getJSON("/api/map"); mapPoints = m.points; } catch { /* nič */ }
+  try { const m = await getJSON("/api/map"); mapPoints = m.points; mapBrakes = m.brakes || []; } catch { /* nič */ }
 }
 function drawMap() {
   const { ctx, w, h } = setupCanvas($("mapCanvas"));
   ctx.clearRect(0, 0, w, h);
   const pts = mapPoints.length > 20 ? mapPoints : trail;
   const project = drawTrack(ctx, w, h, pts);
+  // najlepšie brzdné body (z kola, ktoré danou zákrutou prešlo najrýchlejšie); ďalšia zákruta zvýraznená
+  if (project && mapPoints.length > 20) {
+    const next = last.corner?.n;
+    ctx.font = "bold 10px sans-serif"; ctx.textAlign = "center";
+    for (const b of mapBrakes) {
+      const [px, py] = project(b.x, b.z);
+      const hi = b.n === next;
+      ctx.fillStyle = hi ? "#ffd60a" : "#bf5af2";
+      ctx.beginPath(); ctx.arc(px, py, hi ? 7 : 5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#000"; ctx.fillText(b.n, px, py + 3.5);
+      if (hi) { ctx.fillStyle = "#ffd60a"; ctx.textAlign = "left"; ctx.fillText(`${b.speed} km/h`, px + 10, py - 6); ctx.textAlign = "center"; }
+    }
+  }
   if (project && lastPos) {
     const [px, py] = project(lastPos[0], lastPos[1]);
     ctx.fillStyle = "#ff3b30"; ctx.beginPath(); ctx.arc(px, py, 6, 0, Math.PI * 2); ctx.fill();
@@ -121,6 +135,9 @@ function onFrame(d) {
   $("lastLap").textContent = fmtTime(d.last_lap);
   $("bestLap").textContent = fmtTime(d.best_lap);
   $("refLap").textContent = fmtTime(d.ref_time);
+  $("predLap").textContent = fmtTime(d.predicted);
+  $("predLap").className = `mono ${d.predicted && d.ref_time ? (d.predicted < d.ref_time ? "faster" : "slower") : ""}`;
+  $("theoLap").textContent = fmtTime(d.theo_time);
   $("lap").textContent = d.total_laps ? `${d.lap + 1} / ${d.total_laps}` : d.lap + 1;
   $("pos").textContent = d.position || "–";
   const gap = (g) => (g ? `${g.toFixed(g < 10 ? 2 : 1)} s` : "–");
@@ -165,6 +182,8 @@ function onFrame(d) {
   $("fuelLap").textContent = d.fuel_per_lap ? `${d.fuel_per_lap.toFixed(2)} ${pct ? "%" : "l"}` : "– (po 1. kole)";
   $("fuelLeft").textContent = fmtNum(d.fuel_laps_left, 1);
   $("trackName").textContent = d.track || "";
+  showStrategy(d);
+  showCapture(d.capture);
 
   if (d.map_version !== mapVersion) { mapVersion = d.map_version; trail = []; loadMap(); }
   lastPos = [d.pos_x, d.pos_z];
@@ -230,6 +249,74 @@ getJSON("/api/update").then((u) => {
     try { localStorage.setItem("updateDismissed", u.latest); } catch { /* nevadí */ }
   };
 }).catch(() => {});
+
+// ---------- stratégia ----------
+function showStrategy(d) {
+  const s = strategy.compute(d);
+  const unit = d.source === "forza" ? "%" : "l";
+  $("stLaps").textContent = s.remaining === null ? "– (nastav v 🏁)" : `${s.remaining.toFixed(1)} kola`;
+  $("stFuel").textContent = s.fuelDelta === null ? "–"
+    : s.fuelDelta >= 0 ? `✓ vystačí (+${s.fuelDelta.toFixed(1)} ${unit})` : `chýba ${(-s.fuelDelta).toFixed(1)} ${unit}`;
+  $("stFuel").style.color = s.fuelDelta === null ? "" : s.fuelDelta >= 0 ? "var(--green)" : "var(--red)";
+  $("stTyres").textContent = s.tyreLaps === null ? "– (po 1. kole)" : `${s.tyreLaps.toFixed(1)} kola`;
+  $("stPit").textContent = !s.needsPit ? (s.remaining === null ? "–" : "netreba")
+    : s.pitEarliest && s.pitEarliest < s.pitLatest ? `kolo ${s.pitEarliest}–${s.pitLatest}` : `najneskôr kolo ${s.pitLatest}`;
+  $("stPit").style.color = s.needsPit ? "var(--yellow)" : "";
+}
+function fillStrategy() {
+  const c = strategy.cfg;
+  $("stMode").value = c.mode;
+  $("stLapsIn").value = c.laps;
+  $("stMinIn").value = c.minutes;
+  $("stReserve").value = c.reserve;
+  $("stWear").value = c.wearLimit;
+  $("stLapsF").hidden = c.mode !== "laps";
+  $("stMinF").hidden = $("stStartRow").hidden = c.mode !== "minutes";
+  $("stStartInfo").textContent = c.start ? `odpočet beží od ${new Date(c.start).toLocaleTimeString("sk-SK")}` : "";
+}
+$("stratBtn").onclick = () => { fillStrategy(); $("stratModal").classList.add("open"); };
+for (const [id, key] of [["stMode", "mode"], ["stLapsIn", "laps"], ["stMinIn", "minutes"], ["stReserve", "reserve"], ["stWear", "wearLimit"]]) {
+  $(id).addEventListener("change", (e) => {
+    strategy.cfg[key] = key === "mode" ? e.target.value : +e.target.value;
+    strategy.save(); fillStrategy();
+  });
+}
+$("stStart").onclick = () => { strategy.cfg.start = Date.now(); strategy.save(); fillStrategy(); toast("Odpočet pretekov spustený"); };
+
+// ---------- nahrávanie obrazu ----------
+function showCapture(c) {
+  const btn = $("recBtn");
+  btn.classList.toggle("on", !!c?.on);
+  btn.textContent = c?.on ? (c.warn || c.error ? "⚠ Obraz" : "⏺ Nahrávam") : "🎥 Obraz";
+}
+let recInfo = null;
+async function fillRec() {
+  recInfo = await getJSON("/api/capture");
+  $("recOn").checked = recInfo.on;
+  $("recOn").disabled = !recInfo.available || !recInfo.local;
+  $("recMon").innerHTML = recInfo.monitors.map((m) => `<option value="${m.n}">${m.n}: ${m.w}×${m.h}${m.primary ? " (hlavný)" : ""}</option>`).join("");
+  $("recMon").value = recInfo.monitor;
+  $("recFps").value = recInfo.fps;
+  $("recWidth").value = recInfo.width;
+  const warn = !recInfo.available ? "Chýbajú balíky na snímanie obrazovky (mss, Pillow)." : recInfo.error || recInfo.warn;
+  $("recWarn").hidden = !warn;
+  $("recWarn").textContent = warn ? `⚠ ${warn}` : "";
+  $("recInfo").textContent = `Nahrávky zaberajú ${recInfo.size_mb} MB · ukladá sa posledných ${recInfo.keep} kôl + najlepšie`
+    + (recInfo.on ? ` · v tomto kole ${recInfo.frames} snímok` : "") + (recInfo.local ? "" : " · meniť sa dá len na PC s aplikáciou");
+}
+async function saveRec(body) {
+  try {
+    await getJSON("/api/capture", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    await fillRec();
+    showCapture(recInfo);
+  } catch (e) { toast(`Chyba: ${e.message}`); }
+}
+$("recBtn").onclick = async () => { await fillRec().catch((e) => toast(e.message)); $("recModal").classList.add("open"); };
+$("recOn").onchange = (e) => saveRec({ on: e.target.checked });
+$("recMon").onchange = (e) => saveRec({ monitor: +e.target.value });
+$("recFps").onchange = (e) => saveRec({ fps: +e.target.value });
+$("recWidth").onchange = (e) => saveRec({ width: +e.target.value });
+getJSON("/api/capture").then(showCapture).catch(() => {});
 
 // ---------- modály ----------
 document.querySelectorAll("[data-close]").forEach((b) =>

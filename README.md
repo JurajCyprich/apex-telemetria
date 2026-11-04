@@ -60,6 +60,32 @@ Bez hry si to môžeš vyskúšať: **⚙ Nastavenia → Demo (simulácia bez hr
 - **Súperi** – odstup pred tebou a za tebou na dashboarde, v prvku *Súperi* na displeji a od inžiniera
   po každom kole. **F1 25** posiela celé poradie (mená, odstupy, boxy), **ACC** a **RaceRoom** len auto
   pred a za tebou. Assetto Corsa, Forza a GT7 údaje o súperoch neposielajú.
+- **Teoretické najlepšie kolo** – trať sa rozdelí na úseky (od brzdenia do zákruty po brzdenie do ďalšej)
+  a z tvojich kôl sa zloží súčet najlepších úsekov – vidíš, koľko času máš reálne v sebe a v ktorom úseku
+  ho strácaš. Na dashboarde aj **predpoveď času** práve jazdeného kola.
+- **Najlepšie brzdné body** – pre každú zákrutu miesto, kde brzdilo kolo, ktoré ňou prešlo najrýchlejšie,
+  s rýchlosťou v zákrute. Fialové body na mape v analýze, na dashboarde (ďalšia zákruta svieti žlto)
+  a v street view. V analýze aj tvoje brzdenie v kolách A / B a **najrýchlejšia stopa** poskladaná
+  z najlepších úsekov.
+- **Street view** – 🎥 *Obraz* na dashboarde zapne nahrávanie: počas jazdy sa robia snímky obrazovky
+  a každá sa označí miestom na trati. V záložke **Street view** potom prechádzaš kolo ako v Google Maps
+  (šípky, koliesko, ťahanie po mape alebo časovej osi, ▶ prehrať): obraz z hry, rýchlosť, prevod, pedále,
+  delta oproti druhému kolu (aj jeho obraz v malom okne), hlásenie *„najlepšie brzdenie o 90 m“* a
+  **stopa zblízka** – tvoja čiara, čiara porovnávaného kola a najrýchlejšia stopa so smerom jazdy hore
+  a bočným odstupom v metroch. Stopa sa berie z polohy auta v telemetrii (presnejšie ako z videa),
+  obraz ukazuje, čo si videl. Hru prepni na *okno bez okraja* – exkluzívna celá obrazovka sa často
+  nedá zachytiť. Ukladá sa posledných 20 kôl s obrazom a najlepšie kolá.
+- **Stratégia na preteky** (🏁 pri palive) – dĺžka pretekov z hry, alebo zadaná v kolách či minútach;
+  ukáže, či palivo vystačí do cieľa (alebo koľko chýba), koľko kôl vydržia gumy a okno na zastávku
+  v boxoch. Inžinier hlási *„Do boxov o 2 kolá“*, *„Box, box!“*, *„Palivo vystačí do cieľa“*.
+- **Pneumatiky a brzdy od inžiniera** – po kole povie, ktoré gumy sú studené alebo sa prehrievajú
+  a ktorý tlak je mimo rozsahu; počas jazdy upozorní na prehriate brzdy a studené gumy po výjazde
+  z boxov. Rozsahy si nastavíš podľa hry a auta.
+- **Pokrok** – graf všetkých kôl na trati s autom v čase, najlepší čas a teoretické najlepšie,
+  konzistencia (o koľko sa ti líšia kolá) a prehľad po dňoch.
+- **Overlay pre OBS** – ľubovoľný displej na adrese `/overlay?l=…` s priehľadným pozadím
+  (tlačidlo **📺 OBS** na displeji skopíruje adresu). V OBS: *Zdroj → Prehliadač*, 1920×1080.
+  Hotová šablóna *Stream (OBS)*.
 - **Kontrola aktualizácií** – pri štarte sa pozrie na GitHub; keď je nová verzia, dashboard ukáže
   pruh s tlačidlom **⬇ Aktualizovať teraz** – aplikácia (`.exe`) si novú verziu stiahne, vymení sa
   a spustí sa znova. Kolá a nastavenia ostanú.
@@ -67,7 +93,7 @@ Bez hry si to môžeš vyskúšať: **⚙ Nastavenia → Demo (simulácia bez hr
 ## Vlastný displej (tablet, druhý PC, mobil)
 
 Záložka **Displej** (alebo QR kód *Displej* v **📱 Mobil**) – vlastná palubovka na inom zariadení
-v sieti. Hotové šablóny: *Palubovka*, *Časomiera*, *Pneumatiky a auto*.
+v sieti. Hotové šablóny: *Palubovka*, *Časomiera*, *Pneumatiky a auto*, *Stream (OBS)*.
 
 V **✎ Upraviť** si ju poskladáš sám: **+ Pridať prvok** (prevod, hodnota, shift svetlá, pruh otáčok,
 delta, pedále, pneumatiky, mapa, G-sily, vlajka, text, tlačidlo z button boxu), ťahaním prvok posunieš,
@@ -124,21 +150,25 @@ Ak mobil stratí spojenie (zamknutie, Wi-Fi), PC ovládač do 0,4 s vynuluje –
 Funguje pre hry na PC (nie pre GT7 na PlayStation).
 
 **Vibrácie z hry:** keď hra rozvibruje ovládač (obrubníky, šmyk, náraz), zavibruje mobil. Silu
-nastavíš v ⚙. Funguje na Androide – iPhone stránkam vibrovať nedovolí.
+nastavíš v ⚙. Na Androide naozaj vibruje. iPhone stránkam vibrovať nedovolí – volant preto ukáže
+vibrácie na obrazovke (okraj zabliká, palubovka sa zatrasie) a na iOS 17.4 až ~26.4 skúša krátke
+haptické ťuknutia. Tlačidlo *Vyskúšať vibrácie* v ⚙ ukáže, čo tvoj mobil zvláda.
 
 ## Štruktúra
 
 ```
 server/          Python backend (aiohttp)
   sims/          čítanie telemetrie jednotlivých hier
-  laps.py        záznam kôl, delta, spotreba paliva
+  laps.py        záznam kôl, delta, spotreba paliva, zákruty
+  analytics.py   teoretické najlepšie kolo, najlepšie brzdné body, najrýchlejšia stopa
+  capture.py     nahrávanie obrazu kola (snímky obrazovky označené miestom na trati)
   keys.py        simulácia kláves pre button box (SendInput)
   gamepad.py     virtuálny Xbox ovládač pre volant na mobile (ViGEmBus)
   displays.py    vlastné displeje (rozloženie prvkov, šablóny)
   certs.py       vlastný HTTPS certifikát (gyroskop na mobile vyžaduje HTTPS)
   app.py         web server (HTTP 8777 + HTTPS 8778), WebSocket, API
-web/             dashboard, analýza, displej, button box, volant (čisté HTML/JS, bez internetu)
-data/            nastavenia, button box profily, uložené kolá a certifikát (vytvorí sa sám)
+web/             dashboard, analýza, street view, pokrok, displej, button box, volant (HTML/JS, bez internetu)
+data/            nastavenia, button box profily, kolá, obraz kôl a certifikát (vytvorí sa sám)
 ```
 
 Parametre: `start.bat --port 9000` (iný port), `start.bat --no-browser`.

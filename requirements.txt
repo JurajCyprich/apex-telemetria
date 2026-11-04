@@ -1,3 +1,5 @@
 aiohttp>=3.9
 segno>=1.6
 cryptography
+mss>=9
+Pillow>=10
