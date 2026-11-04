@@ -3,7 +3,8 @@
 // slovenčina, inak angličtina), alebo ho určí používateľ v nastaveniach.
 const engineer = (() => {
   const DEFAULTS = { on: false, voice: "", lang: "auto", volume: 1, rate: 1.05,
-    laps: true, fuel: true, flags: true, pit: true, corners: true, cornerLead: 3, cornerNum: true };
+    laps: true, fuel: true, flags: true, pit: true, corners: true, cornerLead: 3, cornerNum: true,
+    coach: true, coachMin: 0.1, gaps: true };
   const cfg = { ...DEFAULTS };
   try { Object.assign(cfg, JSON.parse(localStorage.getItem("engineer") || "{}")); } catch { /* bez úložiska */ }
   const save = () => { try { localStorage.setItem("engineer", JSON.stringify(cfg)); } catch { /* nevadí */ } };
@@ -43,6 +44,12 @@ const engineer = (() => {
       green: "Zelená, trať je voľná",
       pit: "Pit limiter!",
       corner: (n, v) => `Zákruta ${n}, ${v}`,
+      coachLost: (n, g) => `Zákruta ${n}: strata ${g}.`,
+      coachGain: (n, g) => `Zákruta ${n}: zisk ${g}.`,
+      causeEarly: (m) => `Brzdíš o ${m} metrov skôr.`,
+      causeLate: (v) => `Neskoro brzdíš, v zákrute o ${v} pomalšie.`,
+      causeSlow: (v) => `V zákrute o ${v} pomalšie.`,
+      gaps: (a, b) => [a && `Pred tebou ${a}`, b && `za tebou ${b}`].filter(Boolean).join(", ") + ".",
       test: "Rádio funguje.",
     },
     en: {
@@ -63,6 +70,12 @@ const engineer = (() => {
       green: "Green flag, track is clear",
       pit: "Pit limiter!",
       corner: (n, v) => `Turn ${n}, ${v}`,
+      coachLost: (n, g) => `Turn ${n}: lost ${g}.`,
+      coachGain: (n, g) => `Turn ${n}: gained ${g}.`,
+      causeEarly: (m) => `Braking ${m} metres early.`,
+      causeLate: (v) => `Braked late, ${v} slower through the corner.`,
+      causeSlow: (v) => `${v} slower through the corner.`,
+      gaps: (a, b) => [a && `Gap ahead ${a}`, b && `behind ${b}`].filter(Boolean).join(", ") + ".",
       test: "Radio check.",
     },
   };
@@ -84,12 +97,13 @@ const engineer = (() => {
   addEventListener("keydown", unlock, { once: true });
 
   const lastSaid = {};
-  function say(text, key, minGapMs = 0, force = false) {
+  function say(text, key, minGapMs = 0, force = false, urgent = false) {
     if (!supported || (!cfg.on && !force)) return;
     const now = Date.now();
     if (key && now - (lastSaid[key] || 0) < minGapMs) return;
     if (key) lastSaid[key] = now;
-    if (speechSynthesis.pending) speechSynthesis.cancel();  // staré hlásenia už nie sú aktuálne
+    // staré hlásenia už nie sú aktuálne; naliehavé (zákruta pred tebou) preruší aj práve hovorené
+    if (urgent ? speechSynthesis.speaking || speechSynthesis.pending : speechSynthesis.pending) speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     const v = pickVoice();
     if (v) { u.voice = v; u.lang = v.lang; } else u.lang = lang() === "sk" ? "sk-SK" : "en-US";
@@ -137,7 +151,7 @@ const engineer = (() => {
       const key = `${d.lap}-${c.n}`;
       if (secs <= cfg.cornerLead && secs > 0.5 && key !== cornerSaid) {
         cornerSaid = key;
-        say(cfg.cornerNum ? t().corner(c.n, c.speed) : String(c.speed));
+        say(cfg.cornerNum ? t().corner(c.n, c.speed) : String(c.speed), null, 0, false, true);
       }
     }
 
@@ -159,12 +173,35 @@ const engineer = (() => {
     return tx.slower(tt, tx.gap(time - ref));
   }
 
+  // hodnotenie zákruty po výjazde: strata/zisk oproti najlepšiemu kolu a hlavná príčina
+  function coachText(st, tx = t()) {
+    if (st.dt === undefined || Math.abs(st.dt) < cfg.coachMin) return null;
+    const gap = tx.gap(Math.abs(st.dt));
+    if (st.dt < 0) return tx.coachGain(st.n, gap);
+    const bd = st.brake_diff;
+    let cause = "";
+    if (bd !== null && bd <= -10) cause = tx.causeEarly(Math.abs(bd));
+    else if (bd !== null && bd >= 15 && st.dv <= -3) cause = tx.causeLate(Math.abs(st.dv));
+    else if (st.dv <= -3) cause = tx.causeSlow(Math.abs(st.dv));
+    return `${tx.coachLost(st.n, gap)} ${cause}`.trim();
+  }
+
+  function corner(st) {
+    if (!cfg.coach) return;
+    const text = coachText(st);
+    if (text) say(text);
+  }
+
   function lap(info) {
     const time = info.time;
     if (cfg.laps && time > 0) say(lapText(time, prevRef));
     if (prevRef === null || time < prevRef) prevRef = time;
     // palivo – údaje o spotrebe prídu s ďalším snímkom, preto chvíľu počkáme
     setTimeout(() => {
+      if (cfg.gaps && (last.gap_ahead || last.gap_behind)) {
+        const g = (x) => (x ? t().gap(x) : "");
+        say(t().gaps(g(last.gap_ahead), g(last.gap_behind)));
+      }
       const left = last.fuel_laps_left;
       if (!cfg.fuel || !left) return;
       // kritické hlásenie má vlastný kľúč – nesmie ho zablokovať bežné hlásenie o palive
@@ -201,10 +238,11 @@ const engineer = (() => {
       $("engNoLocal").hidden = !!localVoice() || !voices.length || lang() !== "sk";
       $("engOn").checked = cfg.on;
       $("engLang").value = cfg.lang;
-      for (const k of ["laps", "fuel", "flags", "pit", "corners", "cornerNum"]) $(`eng_${k}`).checked = cfg[k];
+      for (const k of ["laps", "fuel", "flags", "pit", "corners", "cornerNum", "coach", "gaps"]) $(`eng_${k}`).checked = cfg[k];
       $("engVolume").value = cfg.volume;
       $("engRate").value = cfg.rate;
       $("engLead").value = cfg.cornerLead;
+      $("engCoachMin").value = cfg.coachMin;
       showLang();
     };
     speechSynthesis.addEventListener("voiceschanged", () => {
@@ -218,7 +256,8 @@ const engineer = (() => {
     $("engVolume").addEventListener("input", (e) => { cfg.volume = +e.target.value; save(); });
     $("engRate").addEventListener("input", (e) => { cfg.rate = +e.target.value; save(); });
     $("engLead").addEventListener("change", (e) => { cfg.cornerLead = +e.target.value; save(); });
-    for (const k of ["laps", "fuel", "flags", "pit", "corners", "cornerNum"]) {
+    $("engCoachMin").addEventListener("change", (e) => { cfg.coachMin = +e.target.value; save(); });
+    for (const k of ["laps", "fuel", "flags", "pit", "corners", "cornerNum", "coach", "gaps"]) {
       $(`eng_${k}`).addEventListener("change", (e) => { cfg[k] = e.target.checked; save(); });
     }
     $("engTest").addEventListener("click", () => {
@@ -227,5 +266,5 @@ const engineer = (() => {
     });
   }
 
-  return { frame, lap, say, setupUI, lapText, lang, T };
+  return { frame, lap, corner, coachText, say, setupUI, lapText, lang, T };
 })();

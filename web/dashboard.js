@@ -123,6 +123,8 @@ function onFrame(d) {
   $("refLap").textContent = fmtTime(d.ref_time);
   $("lap").textContent = d.total_laps ? `${d.lap + 1} / ${d.total_laps}` : d.lap + 1;
   $("pos").textContent = d.position || "–";
+  const gap = (g) => (g ? `${g.toFixed(g < 10 ? 2 : 1)} s` : "–");
+  $("gaps").textContent = d.gap_ahead || d.gap_behind ? `${gap(d.gap_ahead)} / ${gap(d.gap_behind)}` : "–";
   const delta = $("delta");
   delta.textContent = d.delta === null || d.delta === undefined ? "bez referencie" : fmtDelta(d.delta);
   delta.className = "delta mono" + (d.delta === null || d.delta === undefined ? " none"
@@ -188,6 +190,7 @@ connectWS((d) => { onFrame(d); engineer.frame(d); }, (msg) => {
     toast(`Kolo ${msg.data.lap} uložené: ${fmtTime(msg.data.time)}`);
     engineer.lap(msg.data);
   }
+  if (msg.type === "corner_stats") engineer.corner(msg.data);
 });
 engineer.setupUI();
 
@@ -200,6 +203,27 @@ getJSON("/api/update").then((u) => {
   $("updVer").textContent = u.latest;
   $("updCur").textContent = u.current;
   $("updLink").href = u.url;
+  if (u.can_install) {
+    // .exe sa vie vymeniť sám: stiahne, zavrie sa a spustí novú verziu
+    $("updLink").textContent = "Čo je nové";
+    $("updLink").classList.remove("primary");
+    $("updInstall").hidden = false;
+    $("updInstall").onclick = async () => {
+      if (!confirm(`Stiahnuť verziu ${u.latest} a reštartovať aplikáciu? Kolá a nastavenia ostanú.`)) return;
+      const b = $("updInstall");
+      b.disabled = true;
+      b.textContent = "⏳ Sťahujem…";
+      try {
+        await getJSON("/api/update/install", { method: "POST" });
+        b.textContent = "✓ Reštartujem…";
+        toast("Aplikácia sa o chvíľu zavrie a spustí nová verzia");
+      } catch (e) {
+        b.disabled = false;
+        b.textContent = "⬇ Aktualizovať teraz";
+        toast(`Aktualizácia zlyhala: ${e.message}`);
+      }
+    };
+  }
   $("update").hidden = false;
   $("updClose").onclick = () => {
     $("update").hidden = true;

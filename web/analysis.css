@@ -28,3 +28,14 @@
 .readout th { color: var(--muted); font-weight: 500; font-family: inherit; }
 .readout td:first-child, .readout th:first-child { text-align: left; color: var(--muted); font-family: inherit; }
 .ca { color: var(--blue); } .cb { color: var(--orange); }
+.ctab { width: 100%; border-collapse: collapse; font-family: var(--mono); }
+.ctab th, .ctab td { padding: 5px 8px; text-align: right; border-bottom: 1px solid #1e2332; }
+.ctab th { color: var(--muted); font-weight: 500; font-family: inherit; }
+.ctab td:first-child, .ctab th:first-child { text-align: left; }
+.ctab tr[data-d] { cursor: pointer; }
+.ctab tr[data-d]:hover { background: var(--panel-2); }
+.ctab tr.worst { background: #ff453a1f; }
+.ctab tr.sum td { border-bottom: 0; color: var(--muted); }
+.ctab small { font-size: 11px; }
+.ctab .faster, .ctab small.faster { color: var(--green); } .ctab .slower, .ctab small.slower { color: var(--red); }
+.corners[hidden] { display: none; }

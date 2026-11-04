@@ -65,6 +65,17 @@ class GraphicsACC(ctypes.Structure):
         ("TC", I), ("TCCut", I), ("EngineMap", I), ("ABS", I), ("fuelXLap", F), ("rainLights", I),
         ("flashingLights", I), ("lightsStage", I), ("exhaustTemperature", F), ("wiperLV", I),
         ("DriverStintTotalTimeLeft", I), ("DriverStintTimeLeft", I), ("rainTyres", I),
+        # ACC 1.8+ (staršia verzia tu má nuly – stránka pamäte je aj tak 4 KB)
+        ("sessionIndex", I), ("usedFuel", F), ("deltaLapTime", W(15)), ("iDeltaLapTime", I),
+        ("estimatedLapTime", W(15)), ("iEstimatedLapTime", I), ("isDeltaPositive", I), ("iSplit", I),
+        ("isValidLap", I), ("fuelEstimatedLaps", F), ("trackStatus", W(33)), ("missingMandatoryPits", I),
+        ("Clock", F), ("directionLightsLeft", I), ("directionLightsRight", I), ("GlobalYellow", I),
+        ("GlobalYellow1", I), ("GlobalYellow2", I), ("GlobalYellow3", I), ("GlobalWhite", I),
+        ("GlobalGreen", I), ("GlobalChequered", I), ("GlobalRed", I), ("mfdTyreSet", I),
+        ("mfdFuelToAdd", F), ("mfdTyrePressureLF", F), ("mfdTyrePressureRF", F), ("mfdTyrePressureLR", F),
+        ("mfdTyrePressureRR", F), ("trackGripStatus", I), ("rainIntensity", I), ("rainIntensityIn10min", I),
+        ("rainIntensityIn30min", I), ("currentTyreSet", I), ("strategyTyreSet", I),
+        ("gapAhead", I), ("gapBehind", I),  # ms
     ]
 
 
@@ -215,6 +226,9 @@ class AssettoSource(Source):
             f.lights = g.lightsStage
             f.wipers = g.wiperLV
             f.rain_lights = bool(g.rainLights)
+            # odstupy v ms; 0 = nie je auto pred / za tebou alebo staršia verzia ACC
+            f.gap_ahead = g.gapAhead / 1000 if 0 < g.gapAhead < 3_600_000 else None
+            f.gap_behind = g.gapBehind / 1000 if 0 < g.gapBehind < 3_600_000 else None
         else:
             f.pos_x, f.pos_z = g.carCoordinates[0], g.carCoordinates[2]
             # v AC sú tc/abs úrovne asistentov (0 = vypnuté)

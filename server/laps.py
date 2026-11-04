@@ -71,6 +71,89 @@ def find_corners(ch, window=60.0, min_drop=12.0):
     return corners
 
 
+def _time_at(ch, dist):
+    """Čas kola v danej vzdialenosti (lineárna interpolácia), None mimo zaznamenaného úseku."""
+    d, t = ch["d"], ch["t"]
+    i = bisect.bisect_left(d, dist)
+    if i <= 0 or i >= len(d):
+        return None
+    frac = (dist - d[i - 1]) / max(1e-6, d[i] - d[i - 1])
+    return t[i - 1] + frac * (t[i] - t[i - 1])
+
+
+def corner_segment(c, nxt=None):
+    """Úsek zákruty: kúsok pred brzdením až po výjazd (najviac po brzdenie ďalšej zákruty)."""
+    end = c["d"] + 120
+    if nxt is not None and nxt["brake_d"] > c["d"]:
+        end = min(end, nxt["brake_d"])
+    return max(0.0, c["brake_d"] - 60), end
+
+
+def brake_point(ch, lo_d, apex_d, sustain=15.0):
+    """Začiatok brzdenia pred vrcholom: prvé súvislé brzdenie dlhé aspoň `sustain` metrov
+    (krátke ťuknutie na rovinke sa nepočíta, druhé pribrzdenie v šikane nerozhoduje).
+    Bez brzdy (len ubratie plynu) koniec rovinky."""
+    d, v = ch["d"], ch["speed"]
+    brake = ch.get("brake") or [0.0] * len(d)
+    lo, apex = bisect.bisect_left(d, lo_d), bisect.bisect_right(d, apex_d)
+    if apex - lo < 2:
+        return None
+    i = lo
+    while i < apex:
+        if brake[i] > 0.15:
+            j = i
+            while j < apex and brake[j] > 0.1:
+                j += 1
+            if d[j - 1] - d[i] >= sustain or j >= apex:
+                return d[i]
+            i = j
+        i += 1
+    peak = max(range(lo, apex), key=v.__getitem__)
+    i = next((t for t in range(apex - 1, peak - 1, -1) if v[t] >= v[peak] - 3), peak)
+    return d[i]
+
+
+def corner_stats(ref_ch, ch, c, nxt=None, prev=None):
+    """Porovná zákrutu v kole `ch` s referenčným kolom (v ktorom bola zákruta `c` nájdená).
+
+    Vráti {n, speed, ref_speed, dv (km/h, + = rýchlejšie), brake_diff (m, + = neskôr), dt (s, + = strata)}
+    alebo None, ak kolo zákrutu celú nepokrýva.
+    """
+    start, end = corner_segment(c, nxt)
+    t0, t1 = _time_at(ch, start), _time_at(ch, end)
+    r0, r1 = _time_at(ref_ch, start), _time_at(ref_ch, end)
+    if None in (t0, t1, r0, r1):
+        return None
+    d, v = ch["d"], ch["speed"]
+    brake = ch.get("brake") or [0.0] * len(d)
+    a, b = bisect.bisect_left(d, c["d"] - 80), bisect.bisect_right(d, c["d"] + 80)
+    if b - a < 3:
+        return None
+    speed = min(v[a:b])
+    # brzdný bod rovnakým pravidlom v oboch kolách, hľadaný najviac 250 m pred brzdením v najlepšom kole,
+    # ale nie pred predchádzajúcou zákrutou
+    lo = c["brake_d"] - 250
+    if prev is not None:
+        lo = max(lo, prev["d"] + 50)
+    bp, ref_bp = brake_point(ch, lo, c["d"]), brake_point(ref_ch, lo, c["d"])
+    diff = round(bp - ref_bp) if bp is not None and ref_bp is not None else None
+    if diff is not None and abs(diff) > 150:
+        diff = None  # nezmyselný rozdiel (výlet mimo trať, brzdenie ešte z predchádzajúcej zákruty)
+    return {"n": c["n"], "d": round(c["d"]), "speed": round(speed), "ref_speed": c["speed"], "dv": round(speed - c["speed"]),
+            "brake_diff": diff,
+            "dt": round((t1 - t0) - (r1 - r0), 3)}
+
+
+def compare_corners(ref_ch, ch):
+    """Všetky zákruty referenčného kola porovnané s kolom `ch` (pre analýzu kôl)."""
+    cs = find_corners(ref_ch)
+    out = []
+    for i, c in enumerate(cs):
+        s = corner_stats(ref_ch, ch, c, cs[i + 1] if i + 1 < len(cs) else None, cs[i - 1] if i else None)
+        out.append(s or {"n": c["n"], "d": round(c["d"]), "ref_speed": c["speed"]})
+    return out
+
+
 class LapStore:
     """Kolá uložené ako JSON v data/laps/<hra>/<trať>/<auto>/<id>.json."""
 
@@ -136,6 +219,7 @@ class LapRecorder:
         self.store = store
         self.key = None
         self.on_lap = None  # callback(lap_summary)
+        self.on_corner = None  # callback(corner_stats) – po výjazde zo zákruty, porovnanie s najlepším kolom
         self._reset_session()
 
     def _reset_session(self):
@@ -150,6 +234,7 @@ class LapRecorder:
 
     def _reset_lap(self, frame, valid_start=False):
         self.samples = {c: [] for c in CHANNELS}
+        self.corners_done = set()
         self.valid_start = valid_start
         self.dist = 0.0
         self.timer = 0.0
@@ -248,7 +333,26 @@ class LapRecorder:
                 ref_t = rt[i - 1] + frac * (rt[i] - rt[i - 1])
                 extra["delta"] = round(lap_t - ref_t, 3)
             extra["corner"] = self.next_corner(d)
+            self._coach(d)
         return extra
+
+    def _coach(self, d):
+        """Po výjazde zo zákruty ju porovná s najlepším kolom (raz za kolo)."""
+        if not self.on_corner or not self.valid_start:
+            return
+        cs = self.corners()
+        for i, c in enumerate(cs):
+            if c["n"] in self.corners_done:
+                continue
+            nxt = cs[i + 1] if i + 1 < len(cs) else None
+            start, end = corner_segment(c, nxt)
+            if d < end:
+                break  # zákruty sú zoradené – ďalšie sú ešte pred autom
+            self.corners_done.add(c["n"])
+            if self.samples["d"] and self.samples["d"][0] <= start:  # celá zákruta v tomto kole
+                stats = corner_stats(self.ref["channels"], self.samples, c, nxt, cs[i - 1] if i else None)
+                if stats:
+                    self.on_corner(stats)
 
     def _finish(self, p, f):
         s = p["samples"]

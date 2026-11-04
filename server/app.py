@@ -2,6 +2,7 @@
 import asyncio
 import json
 import logging
+import os
 import socket
 import time
 
@@ -12,7 +13,7 @@ from . import certs, displays, keys, updates
 from .gamepad import VirtualPad
 from .config import (DATA, WEB, load_buttonbox, load_settings, save_buttonbox,
                      save_settings)
-from .laps import LapRecorder, LapStore
+from .laps import LapRecorder, LapStore, compare_corners, find_corners
 from .sims import SOURCES
 
 log = logging.getLogger("app")
@@ -57,12 +58,14 @@ class TelemetryApp:
         self.store = LapStore(DATA / "laps")
         self.recorder = LapRecorder(self.store)
         self.recorder.on_lap = lambda lap: self.events.append({"type": "lap", "data": lap})
+        self.recorder.on_corner = lambda st: self.events.append({"type": "corner_stats", "data": st})
         self.latest = {}
         self.active_id = None
         self.tasks = {}
         self.clients = set()
         self.events = []
         self.held = {}  # ws -> {button_id: combo}
+        self.standings_sent = 0.0
         self.pad = VirtualPad()
         self.last_rumble = {}  # ws -> (large, small)
         loop = asyncio.get_running_loop()
@@ -125,6 +128,12 @@ class TelemetryApp:
             else:
                 data = f.to_dict()
                 data.update(self.recorder.update(f, dt))
+                # tabuľka súperov je veľká – stačí 2× za sekundu (klienti si držia poslednú)
+                if data.get("standings") is not None:
+                    if now - self.standings_sent < 0.5:
+                        del data["standings"]
+                    else:
+                        self.standings_sent = now
             if not self.clients:
                 self.events.clear()
                 continue
@@ -216,7 +225,22 @@ class TelemetryApp:
                                   "sources": {sid: c.name for sid, c in SOURCES.items()}})
 
     async def api_update(self, request):
-        return web.json_response(await updates.check())
+        data = dict(await updates.check())
+        data["can_install"] = data["can_install"] and is_local(request)  # z mobilu nie
+        return web.json_response(data)
+
+    @local_only
+    async def api_update_install(self, request):
+        try:
+            bat = await updates.install()
+        except Exception as e:
+            log.exception("Aktualizácia zlyhala")
+            raise web.HTTPInternalServerError(text=str(e))
+        updates.launch_updater(bat)
+        self.pad.neutral()  # nenechať volant na plyne
+        # odpoveď ešte stihne odísť, potom sa aplikácia zavrie a pomocný skript vymení .exe
+        asyncio.get_running_loop().call_later(0.8, os._exit, 0)
+        return web.json_response({"ok": True})
 
     async def api_settings(self, request):
         return web.json_response(self.settings)
@@ -297,6 +321,19 @@ class TelemetryApp:
         ok = self.store.delete(request.match_info["id"])
         return web.json_response({"ok": ok})
 
+    async def api_corners(self, request):
+        """Zákruty kola A a porovnanie kola B s ním (strata času, rýchlosť, brzdenie)."""
+        a = await asyncio.to_thread(self.store.load, request.query.get("a", ""))
+        if not a:
+            raise web.HTTPNotFound(text="Kolo A nenájdené")
+        b_id = request.query.get("b")
+        b = await asyncio.to_thread(self.store.load, b_id) if b_id else None
+        if b:
+            corners = await asyncio.to_thread(compare_corners, a["channels"], b["channels"])
+        else:
+            corners = [{"n": c["n"], "d": round(c["d"]), "ref_speed": c["speed"]} for c in find_corners(a["channels"])]
+        return web.json_response({"corners": corners})
+
     async def api_map(self, request):
         return web.json_response({"points": self.recorder.map_points(),
                                   "version": self.recorder.map_version})
@@ -324,6 +361,7 @@ class TelemetryApp:
         r.add_get("/ws", self.ws_handler)
         r.add_get("/api/info", self.api_info)
         r.add_get("/api/update", self.api_update)
+        r.add_post("/api/update/install", self.api_update_install)
         r.add_get("/api/settings", self.api_settings)
         r.add_post("/api/settings", self.api_settings_save)
         r.add_get("/api/buttonbox", self.api_buttonbox)
@@ -335,6 +373,7 @@ class TelemetryApp:
         r.add_get("/api/laps/{id}", self.api_lap)
         r.add_delete("/api/laps/{id}", self.api_lap_delete)
         r.add_get("/api/map", self.api_map)
+        r.add_get("/api/corners", self.api_corners)
         r.add_static("/static/", WEB)
         return app
 

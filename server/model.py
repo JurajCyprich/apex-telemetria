@@ -65,6 +65,11 @@ class Frame:
     track_temp: Optional[float] = None
     flag: str = ""
 
+    # súperi (len hry, ktoré to posielajú: F1, ACC, RaceRoom)
+    gap_ahead: Optional[float] = None     # s k autu pred tebou
+    gap_behind: Optional[float] = None    # s k autu za tebou
+    standings: Optional[list] = None      # [{pos, name, leader, ahead, last, pit, me, lap}] – zatiaľ F1
+
     def to_dict(self):
         return asdict(self)
 

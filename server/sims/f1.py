@@ -14,7 +14,7 @@ LAP = struct.Struct("<IIHBHBHBHBfffBBBBBBBBBBBBBBBHHBfB")  # 57 B
 TELEMETRY = struct.Struct("<HfffBbHBBH4H4B4BH4f4B")  # 60 B
 STATUS = struct.Struct("<BBBBBfffHHBBHBBBbfffBfffB")  # 55 B
 
-PKT_MOTION, PKT_SESSION, PKT_LAP, PKT_TELEMETRY, PKT_STATUS, PKT_DAMAGE = 0, 1, 2, 6, 7, 10
+PKT_MOTION, PKT_SESSION, PKT_LAP, PKT_PARTICIPANTS, PKT_TELEMETRY, PKT_STATUS, PKT_DAMAGE = 0, 1, 2, 4, 6, 7, 10
 
 TRACKS = {
     0: "Melbourne", 1: "Paul Ricard", 2: "Shanghai", 3: "Bahrajn", 4: "Barcelona", 5: "Monako",
@@ -44,6 +44,8 @@ class F1Source(UdpSource):
         super().__init__(settings, emit)
         self.port = int(settings.get("f1_port", 20777))
         self.frame = Frame(source=self.id, game=self.name, connected=True)
+        self.names = {}    # index auta -> meno jazdca (paket Participants)
+        self.numbers = {}  # index auta -> štartové číslo
 
     def on_packet(self, data, addr):
         if len(data) < HEADER.size:
@@ -60,7 +62,9 @@ class F1Source(UdpSource):
             f.connected = True
             self.emit(Frame(**f.__dict__))
         elif pid == PKT_LAP:
-            self._lap(data, off + player * LAP.size)
+            self._lap(data, off, player)
+        elif pid == PKT_PARTICIPANTS:
+            self._participants(data, off, fmt)
         elif pid == PKT_STATUS:
             self._status(data, off + player * STATUS.size)
         elif pid == PKT_MOTION:
@@ -89,8 +93,24 @@ class F1Source(UdpSource):
         f.tyre_pressure = _fl(pressure)
         f.water_temp = float(_engine_temp)
 
-    def _lap(self, data, o):
-        v = LAP.unpack_from(data, o)
+    def _participants(self, data, o, fmt):
+        # F1 25: 57 B na auto, meno 32 znakov; F1 23/24: meno 48 znakov. Meno je vždy od 7. bajtu.
+        size = (len(data) - o - 1) // NUM_CARS
+        name_len = 32 if fmt >= 2025 else 48
+        if size < 7 + name_len:
+            return
+        for i in range(NUM_CARS):
+            p = o + 1 + i * size
+            self.names[i] = data[p + 7:p + 7 + name_len].split(b"\0", 1)[0].decode("utf-8", "replace").strip()
+            self.numbers[i] = data[p + 5]
+
+    def _lap(self, data, off, player):
+        cars = [LAP.unpack_from(data, off + i * LAP.size) for i in range(NUM_CARS)
+                if off + (i + 1) * LAP.size <= len(data)]
+        if player >= len(cars):
+            return
+        self._standings(cars, player)
+        v = cars[player]
         f = self.frame
         f.last_lap = v[0] / 1000
         f.lap_time = v[1] / 1000
@@ -101,6 +121,26 @@ class F1Source(UdpSource):
         f.sector = v[17]
         if f.last_lap and (not f.best_lap or f.last_lap < f.best_lap):
             f.best_lap = f.last_lap
+
+    def _standings(self, cars, player):
+        """Poradie a odstupy zo všetkých áut (v[13] pozícia, v[6..9] odstupy, v[26] stav jazdca)."""
+        def ahead(c):
+            return c[7] * 60 + c[6] / 1000  # k autu pred ním (minúty + ms)
+
+        def leader(c):
+            return c[9] * 60 + c[8] / 1000
+        active = [(i, c) for i, c in enumerate(cars) if c[26] >= 2 and c[13] > 0]  # 2+ = jazdí / v cieli / mimo
+        active.sort(key=lambda x: x[1][13])
+        f = self.frame
+        me = cars[player]
+        f.gap_ahead = round(ahead(me), 3) if me[13] > 1 and ahead(me) > 0 else None
+        behind = next((c for _, c in active if c[13] == me[13] + 1), None)
+        f.gap_behind = round(ahead(behind), 3) if behind and ahead(behind) > 0 else None
+        f.standings = [{
+            "pos": c[13], "name": self.names.get(i) or f"#{self.numbers.get(i, i + 1)}",
+            "leader": round(leader(c), 3), "ahead": round(ahead(c), 3), "last": round(c[0] / 1000, 3),
+            "pit": c[15] > 0, "me": i == player, "lap": c[14], "out": c[26] > 3,
+        } for i, c in active]
 
     def _status(self, data, o):
         v = STATUS.unpack_from(data, o)

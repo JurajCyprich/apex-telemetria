@@ -33,6 +33,8 @@ const FIELDS = {
   lap_no: { g: "Časy", label: "Kolo", get: (d) => (d.lap === undefined ? null : d.total_laps ? `${d.lap + 1}/${d.total_laps}` : d.lap + 1) },
   position: { g: "Časy", label: "Pozícia", get: (d) => d.position || null, d: 0 },
   lap_dist: { g: "Časy", label: "Vzdialenosť v kole", unit: "m", d: 0, get: (d) => (d.lap_dist >= 0 ? d.lap_dist : null) },
+  gap_ahead: { g: "Súperi", label: "Odstup pred tebou", unit: "s", d: 2 },
+  gap_behind: { g: "Súperi", label: "Odstup za tebou", unit: "s", d: 2 },
   corner_speed: { g: "Zákruty", label: "Rýchlosť ďalšej zákruty", unit: "km/h", d: 0, get: (d) => d.corner?.speed ?? null },
   corner_n: { g: "Zákruty", label: "Ďalšia zákruta", d: 0, get: (d) => d.corner?.n ?? null },
   corner_dist: { g: "Zákruty", label: "Do brzdenia", unit: "m", d: 0, get: (d) => d.corner?.dist ?? null },
@@ -93,7 +95,8 @@ const S = { ratio: 0, shift: false, blink: false, maxSeen: 0, mapPoints: [], map
 setInterval(() => { S.blink = !S.blink; }, 90);
 
 function computeShared(d) {
-  if (!d.connected) { S.ratio = 0; S.shift = false; return; }
+  if (!d.connected) { S.ratio = 0; S.shift = false; S.standings = null; return; }
+  if (d.standings !== undefined) S.standings = d.standings;  // server ju posiela len 2× za sekundu
   if (d.rpm > S.maxSeen) S.maxSeen = d.rpm;
   const max = d.max_rpm || S.maxSeen || 8000;
   const start = max * 0.72;
@@ -325,6 +328,45 @@ const TYPES = {
         box.style.background = f ? FLAG_COLORS[f] || "#444" : "";
         box.style.color = f === "white" || f === "yellow" ? "#000" : "#fff";
         setText(box, f ? FLAG_NAMES[f] || f : o.hide === false ? "Bez vlajky" : "");
+      };
+    },
+  },
+  standings: {
+    name: "Súperi", desc: "Poradie a odstupy (F1 celé poradie; ACC a RaceRoom auto pred a za tebou)", size: [8, 8],
+    props: [
+      { k: "rows", label: "Počet riadkov", type: "select", options: { 3: "3", 5: "5", 7: "7", 10: "10", 22: "Všetci" }, def: "7" },
+      { k: "mode", label: "Zobraziť", type: "select", options: { around: "Okolo mňa", top: "Od lídra" }, def: "around" },
+      { k: "gap", label: "Odstup", type: "select", options: { ahead: "K autu pred ním", leader: "Od lídra" }, def: "ahead" },
+    ],
+    make(el, o) {
+      el.innerHTML = '<div class="stand"></div>';
+      const box = el.firstChild;
+      const rows = +(o.rows || 7);
+      box.style.setProperty("--rows", Math.min(rows, 22));
+      const sec = (v) => (v ? v.toFixed(v < 10 ? 3 : 1) : "");
+      return (d) => {
+        let html;
+        const list = d.connected ? S.standings : null;
+        if (list && list.length) {
+          let from = 0;
+          const me = list.findIndex((r) => r.me);
+          if (o.mode !== "top" && me >= 0) from = Math.max(0, Math.min(list.length - rows, me - Math.floor(rows / 2)));
+          box.style.setProperty("--rows", Math.min(rows, list.length));
+          html = list.slice(from, from + rows).map((r) => {
+            const g = o.gap === "leader" ? r.leader : r.ahead;
+            return `<div class="sr ${r.me ? "me" : ""} ${r.out ? "out" : ""}"><b>${r.pos}</b><span>${esc(r.name)}</span>`
+              + `<i>${r.pit ? "BOX" : r.pos === 1 ? "" : `+${sec(g)}`}</i></div>`;
+          }).join("");
+        } else if (d.connected && (d.gap_ahead || d.gap_behind)) {
+          // ACC / RaceRoom: len auto pred a za tebou
+          html = `<div class="sr"><b>▲</b><span>Pred tebou</span><i>${d.gap_ahead ? `−${sec(d.gap_ahead)}` : "–"}</i></div>`
+            + `<div class="sr me"><b>${d.position || ""}</b><span>Ty</span><i></i></div>`
+            + `<div class="sr"><b>▼</b><span>Za tebou</span><i>${d.gap_behind ? `+${sec(d.gap_behind)}` : "–"}</i></div>`;
+          box.style.setProperty("--rows", 3);
+        } else {
+          html = `<div class="missing">${d.connected ? "Táto hra neposiela údaje o súperoch" : "–"}</div>`;
+        }
+        if (box._h !== html) { box._h = html; box.innerHTML = html; }
       };
     },
   },

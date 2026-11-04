@@ -85,10 +85,55 @@ function deltaSeries(a, b) {
 
 function draw() {
   drawSummary();
+  drawCorners();
   drawCharts();
   drawMap();
   drawReadout();
 }
+
+// ---------- zákruty: kde kolo B stráca / získava oproti kolu A ----------
+let corners = { key: null, list: [] };
+async function drawCorners() {
+  const card = $("cornersCard");
+  if (!lapA) { card.hidden = true; return; }
+  const key = `${lapA.id}|${lapB?.id || ""}`;
+  if (corners.key !== key) {
+    corners = { key, list: [] };
+    try {
+      const r = await getJSON(`/api/corners?a=${lapA.id}${lapB ? `&b=${lapB.id}` : ""}`);
+      if (corners.key !== key) return;  // medzitým vybraté iné kolo
+      corners.list = r.corners;
+    } catch { corners.list = []; }
+  }
+  const list = corners.list;
+  card.hidden = !list.length;
+  if (!list.length) return;
+  $("cornersHint").textContent = lapB ? "· kolo B oproti A · klikni na riadok = ukázať na grafe a mape" : "· vyber aj kolo B na porovnanie";
+  const worst = lapB ? Math.max(...list.map((c) => c.dt ?? -Infinity)) : null;
+  const sign = (v, unit = "") => (v > 0 ? `+${v}` : `${v}`) + unit;
+  const rows = list.map((c) => {
+    if (!lapB) return `<tr data-d="${c.d}"><td>${c.n}</td><td class="ca">${c.ref_speed} km/h</td></tr>`;
+    if (c.dt === undefined) return `<tr data-d="${c.d}"><td>${c.n}</td><td class="ca">${c.ref_speed}</td><td colspan="3" class="muted">kolo B zákrutu nepokrýva</td></tr>`;
+    const dtCls = c.dt > 0.02 ? "slower" : c.dt < -0.02 ? "faster" : "";
+    const bd = c.brake_diff === null ? "–" : c.brake_diff === 0 ? "rovnako"
+      : `${Math.abs(c.brake_diff)} m ${c.brake_diff < 0 ? "skôr" : "neskôr"}`;
+    return `<tr data-d="${c.d}" class="${c.dt === worst && c.dt > 0.05 ? "worst" : ""}"><td>${c.n}</td>
+      <td class="ca">${c.ref_speed}</td><td class="cb">${c.speed} <small class="${c.dv < 0 ? "slower" : c.dv > 0 ? "faster" : ""}">(${sign(c.dv)})</small></td>
+      <td>${bd}</td><td class="${dtCls}"><b>${sign(c.dt.toFixed(3), " s")}</b></td></tr>`;
+  });
+  const total = lapB ? list.reduce((s, c) => s + (c.dt || 0), 0) : null;
+  $("cornersTable").innerHTML = `<table class="ctab">
+    <tr><th>#</th><th class="ca">${lapB ? "A km/h" : "Najnižšia rýchlosť"}</th>${lapB ? '<th class="cb">B km/h</th><th>Brzdenie B</th><th>Čas B − A</th>' : ""}</tr>
+    ${rows.join("")}
+    ${lapB ? `<tr class="sum"><td colspan="4">Spolu v zákrutách</td><td class="${total > 0 ? "slower" : "faster"}"><b>${sign(total.toFixed(3), " s")}</b></td></tr>` : ""}
+  </table>`;
+}
+$("cornersTable").addEventListener("click", (e) => {
+  const tr = e.target.closest("tr[data-d]");
+  if (!tr) return;
+  hoverD = +tr.dataset.d;
+  drawCharts(); drawMap(); drawReadout();
+});
 
 function drawSummary() {
   const el = $("summary");

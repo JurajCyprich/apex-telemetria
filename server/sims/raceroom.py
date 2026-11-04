@@ -224,6 +224,9 @@ class RaceRoomSource(Source):
         f.lap = max(0, d.completed_laps)
         f.total_laps = max(0, d.number_of_laps)
         f.position = max(0, d.position)
+        # odstupy v s; -1 = nie je k dispozícii
+        f.gap_ahead = round(d.time_delta_front, 3) if d.time_delta_front > 0 else None
+        f.gap_behind = round(d.time_delta_behind, 3) if d.time_delta_behind > 0 else None
         f.lap_time = max(0.0, d.lap_time_current_self)
         f.last_lap = max(0.0, d.lap_time_previous_self)
         f.best_lap = max(0.0, d.lap_time_best_self)

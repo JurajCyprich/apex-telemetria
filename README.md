@@ -52,8 +52,17 @@ Bez hry si to môžeš vyskúšať: **⚙ Nastavenia → Demo (simulácia bez hr
   **Rýchlosť pred zákrutou:** z tvojho najlepšieho uloženého kola s daným autom na danej trati nájde
   zákruty a ich najnižšiu rýchlosť a pred každou ju ohlási („Zákruta 3, 104“) – s predstihom 2–5 s
   pred bodom brzdenia. Kým na trati nemáš uložené kolo, mlčí.
+  **Hodnotenie po zákrute:** po výjazde povie stratu alebo zisk oproti najlepšiemu kolu a hlavnú
+  príčinu („Zákruta 2: strata 0,4. Brzdíš o 20 metrov skôr.“). Hlási, až keď je rozdiel nad nastavenú
+  hranicu (0,05–0,3 s).
+- **Koučing v analýze** – pri porovnaní dvoch kôl tabuľka zákrut: rýchlosť v zákrute, o koľko metrov
+  skôr/neskôr si brzdil a koľko času si v každej zákrute stratil. Klik na riadok ukáže miesto na grafe a mape.
+- **Súperi** – odstup pred tebou a za tebou na dashboarde, v prvku *Súperi* na displeji a od inžiniera
+  po každom kole. **F1 25** posiela celé poradie (mená, odstupy, boxy), **ACC** a **RaceRoom** len auto
+  pred a za tebou. Assetto Corsa, Forza a GT7 údaje o súperoch neposielajú.
 - **Kontrola aktualizácií** – pri štarte sa pozrie na GitHub; keď je nová verzia, dashboard ukáže
-  pruh s odkazom na stiahnutie.
+  pruh s tlačidlom **⬇ Aktualizovať teraz** – aplikácia (`.exe`) si novú verziu stiahne, vymení sa
+  a spustí sa znova. Kolá a nastavenia ostanú.
 
 ## Vlastný displej (tablet, druhý PC, mobil)
 
