@@ -222,10 +222,13 @@ const ws = connectWS((d) => { onFrame(d); engineer.frame(d); training.frame(d); 
     engineer.lap(msg.data);
   }
   if (msg.type === "corner_stats") engineer.corner(msg.data);
+  if (msg.type === "wheel_state") wheelCfg.onState(msg);
+  if (msg.type === "wheel_gone") wheelCfg.onGone(msg.id);
 });
 engineer.setupUI();
 engineer.setSender((m) => ws.send(m));
 training.setup();
+wheelCfg.setup((m) => ws.send(m));
 
 // ---------- nová verzia na GitHube ----------
 getJSON("/api/update").then((u) => {

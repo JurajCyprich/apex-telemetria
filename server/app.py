@@ -78,6 +78,9 @@ class TelemetryApp:
         self.standings_sent = 0.0
         self.pad = VirtualPad()
         self.last_rumble = {}  # ws -> (large, small)
+        self.local_ws = set()  # stránky otvorené na tomto PC (dostávajú stav volantov z mobilov)
+        self.wheels = set()    # volanty na mobiloch, ktoré posielajú svoj stav
+        self._pad_status = (0.0, None)
         loop = asyncio.get_running_loop()
         self.pad.on_rumble = lambda ws, large, small: loop.call_soon_threadsafe(self._rumble, ws, large, small)
         self.https_port = None
@@ -166,6 +169,13 @@ class TelemetryApp:
         except (ConnectionError, RuntimeError):
             self.clients.discard(ws)
 
+    def pad_status(self):
+        """Stav virtuálneho Xbox ovládača (najviac raz za 2 s – volá sa pri každom hlásení volantu)."""
+        now = time.monotonic()
+        if now - self._pad_status[0] > 2.0:
+            self._pad_status = (now, self.pad.status())
+        return self._pad_status[1]
+
     # ---------- WebSocket ----------
     async def ws_handler(self, request):
         ws = web.WebSocketResponse(heartbeat=10)
@@ -174,6 +184,8 @@ class TelemetryApp:
         self.held[ws] = {}
         pad_ok = None
         local = is_local(request)
+        if local:
+            self.local_ws.add(ws)
         try:
             async for msg in ws:
                 if msg.type != WSMsgType.TEXT:
@@ -190,6 +202,18 @@ class TelemetryApp:
                         await self._send(ws, json.dumps({"type": "pad_status", **self.pad.status()}))
                 elif kind == "press":
                     await self._press(ws, data)
+                elif kind == "wheel_state":
+                    # volant na mobile hlási náklon, pedále a nastavenie -> nastavenie volantu na PC
+                    self.wheels.add(ws)
+                    out = json.dumps({**data, "type": "wheel_state", "id": id(ws), "ip": request.remote,
+                                      "ua": request.headers.get("User-Agent", "")[:200], "pad": self.pad_status()})
+                    for other in list(self.local_ws):
+                        if other is not ws:
+                            await self._send(other, out)
+                elif kind == "wheel_cmd" and local:
+                    target = next((w for w in self.wheels if id(w) == data.get("id")), None)
+                    if target is not None:
+                        await self._send(target, json.dumps({**data, "type": "wheel_cmd"}))
                 elif kind == "say" and local:
                     # hlásenie inžiniera z dashboardu na PC -> prečíta ho volant na mobile (slúchadlá)
                     rate = data.get("rate")
@@ -202,6 +226,12 @@ class TelemetryApp:
                             await self._send(other, out)
         finally:
             self.clients.discard(ws)
+            self.local_ws.discard(ws)
+            if ws in self.wheels:
+                self.wheels.discard(ws)
+                gone = json.dumps({"type": "wheel_gone", "id": id(ws)})
+                for other in list(self.local_ws):
+                    await self._send(other, gone)
             self.pad.neutral(ws)  # odpojený volant -> pustiť plyn
             self.last_rumble.pop(ws, None)
             for combo in self.held.pop(ws, {}).values():

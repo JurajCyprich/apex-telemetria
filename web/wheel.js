@@ -370,12 +370,72 @@ ws = connectWS((d) => {
     setRumble(msg.l, msg.s);
   } else if (msg.type === "say") {
     sayHere(msg);
+  } else if (msg.type === "wheel_cmd") {
+    remoteCmd(msg);
   } else if (msg.type === "pad_status") {
     padErr.hidden = !msg.error;
     padErr.textContent = msg.error ? `⚠ ${msg.error} (ťukni pre skrytie)` : "";
   }
 });
 padErr.addEventListener("click", () => { padErr.hidden = true; });
+
+// ---------- nastavovanie z PC ----------
+// Mobil posiela PC svoj stav (náklon, pedále, tlačidlá, nastavenie) – na PC to vidíš a nastavíš aj bez hry.
+const GLOBAL_KEYS = ["style", "curve", "rumbleGain", "vibrate", "rumble", "fx", "say", "rumbleFx"];
+function reportState() {
+  if (!ws || !ws.connected) return;
+  const prof = { ...profiles, [profileName]: { ...sp } };
+  if (!prof[GENERIC]) prof[GENERIC] = { ...STEER_DEFAULTS };
+  for (const k of Object.keys(prof)) prof[k] = { ...STEER_DEFAULTS, ...prof[k] };
+  ws.send({
+    type: "wheel_state", running, app: !!NATIVE, ios: IS_IOS, sensor,
+    angle: rawAngle === null ? null : +steerDeg.toFixed(1), flat: tooFlat,
+    out: +steerValue().toFixed(3), thr: +input.thr.toFixed(3), brk: +input.brk.toFixed(3), btn: [...input.btn],
+    rumble: +rumbleLevel.toFixed(2), profile: profileName, profiles: prof, defaults: STEER_DEFAULTS,
+    cfg: Object.fromEntries(GLOBAL_KEYS.map((k) => [k, cfg[k]])),
+  });
+}
+setInterval(reportState, 100);
+
+const STEER_LIMITS = { range: [20, 180], dead: [0, 15], anti: [0, 35], lin: [1, 3], smooth: [0, 95] };
+function remoteCmd(m) {
+  if (m.op === "set") {
+    const name = m.profile || profileName;
+    if (m.sp) {
+      const cur = name === profileName ? sp : { ...STEER_DEFAULTS, ...profiles[name] };
+      for (const [k, [lo, hi]] of Object.entries(STEER_LIMITS)) {
+        if (typeof m.sp[k] === "number") cur[k] = Math.min(hi, Math.max(lo, m.sp[k]));
+      }
+      if (typeof m.sp.invert === "boolean") cur.invert = m.sp.invert;
+      profiles[name] = { ...cur };
+      if (name === profileName) { sp = cur; steerFilter.reset(); }
+    }
+    if (m.cfg) {
+      for (const k of GLOBAL_KEYS) {
+        if (m.cfg[k] === undefined) continue;
+        if (k === "style" && !STYLES[m.cfg[k]]) continue;
+        cfg[k] = typeof DEFAULTS[k] === "number" ? Number(m.cfg[k]) : m.cfg[k];
+      }
+      if (m.cfg.style) applyStyle();
+      if (m.cfg.rumble === false) setRumble(0, 0);
+      if (m.cfg.fx === false) telemetryFx({});
+    }
+    saveCfg();
+    if ($("setModal").classList.contains("open")) fillSettings();
+  } else if (m.op === "reset") {
+    const name = m.profile || profileName;
+    profiles[name] = { ...STEER_DEFAULTS };
+    if (name === profileName) { sp = { ...STEER_DEFAULTS }; steerFilter.reset(); }
+    saveCfg();
+    if ($("setModal").classList.contains("open")) fillSettings();
+  } else if (m.op === "calibrate") {
+    calibrate();
+    toast("Stred volantu nastavený z PC");
+  } else if (m.op === "test") {
+    $("testRumble").click();
+  }
+  reportState();
+}
 
 // hlas inžiniera z PC: appka číta systémovým hlasom iOS (ide aj do AirPods), prehliadač cez speechSynthesis
 function sayHere(m) {

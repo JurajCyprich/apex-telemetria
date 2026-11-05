@@ -124,3 +124,28 @@ a.btn { text-decoration: none; display: inline-block; }
 .tr-table td:first-child, .tr-table th:first-child { text-align: left; }
 .tr-table td { font-family: var(--mono); }
 .tr-table tr.best td { color: var(--green); }
+
+/* nastavenie volantu z PC */
+.modal.wide.wc { width: min(980px, 100%); }
+.wc .ok { color: var(--green); }
+.wc .warn { color: var(--orange); }
+.wc-live { display: grid; grid-template-columns: 220px 1fr; gap: 16px; align-items: center; margin: 8px 0; }
+@media (max-width: 640px) { .wc-live { grid-template-columns: 1fr; } }
+#wcWheel { width: 220px; height: 220px; display: block; }
+.wc-row { display: flex; justify-content: space-between; align-items: baseline; }
+.wc-row small, .wc-pedals small { color: var(--muted); font-size: 11px; }
+.wc-out { position: relative; height: 18px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; margin: 4px 0 12px; overflow: hidden; }
+.wc-out i { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--muted); }
+.wc-out b { position: absolute; top: 2px; bottom: 2px; background: var(--blue); border-radius: 4px; }
+.wc-pedals { display: grid; grid-template-columns: 70px 70px 1fr; gap: 12px; align-items: end; }
+.wc-pedals > div { display: flex; flex-direction: column; gap: 4px; }
+.wc-ped { position: relative; height: 110px; width: 34px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.wc-ped b { position: absolute; left: 0; right: 0; bottom: 0; }
+.wc-ped b.thr { background: var(--green); } .wc-ped b.brk { background: var(--red); }
+#wcButtons { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+#wcButtons span { padding: 3px 8px; border-radius: 6px; background: var(--panel-2); border: 1px solid var(--line); font-size: 12px; }
+#wcButtons span.on { background: var(--orange); color: #000; border-color: var(--orange); }
+.wc-rumble { height: 8px; background: var(--panel-2); border-radius: 4px; overflow: hidden; }
+.wc-rumble b { display: block; height: 100%; background: var(--purple); }
+#wcCurve2 { width: 100%; height: 130px; display: block; background: #0e1118; border-radius: 8px; margin-bottom: 8px; }
+.actions.left { justify-content: flex-start; }

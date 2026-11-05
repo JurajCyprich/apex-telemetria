@@ -152,6 +152,11 @@ s rýchlosťou, prevodom a shift svetlami – štýl (F1, GT, analógový otáč
 4. V hre nastav ovládanie na Xbox ovládač: zatáčanie = ľavá páčka, plyn = RT, brzda = LT,
    radenie = RB / LB.
 
+**Nastavenie volantu z PC:** v ⚙ Nastavenia (alebo 📱 Mobil) klikni **🎮 Nastaviť volant**. Kým je volant
+na mobile otvorený, uvidíš na PC živý náklon, výstup do hry, plyn, brzdu, stlačené tlačidlá a vibrácie –
+aj bez spustenej hry. Nastavíš tam všetko ako v ⚙ na mobile (profil zatáčania, uhol, krivku, vyhladenie,
+mŕtve zóny, pedále, vibrácie, palubovku), nastavíš stred a vyskúšaš vibrácie. Zmeny sa hneď uložia v mobile.
+
 **Presnosť a nastavenie podľa hry:** zatáčanie sa číta z gyroskopu (systém ho skladá z gyroskopu
 aj akcelerometra, netrasie sa od pohybu rúk) a vyhladzuje sa adaptívnym filtrom – v pokoji je stabilné,
 pri rýchlom zatočení nepridá oneskorenie. Každá hra má **vlastný profil**, ktorý sa prepne sám podľa

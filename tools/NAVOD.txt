@@ -31,6 +31,10 @@ MOBIL (rovnaká Wi-Fi ako PC)
   3. V hre nastav ovládanie na Xbox ovládač: zatáčanie = ľavá páčka, plyn = RT, brzda = LT,
      radenie = RB / LB.
 
+NOVINKY 1.8
+- ⚙ Nastavenia → 🎮 Nastaviť volant: na PC vidíš náklon, pedále a tlačidlá z mobilu a nastavíš volant
+  (zatáčanie, pedále, vibrácie) aj bez spustenej hry.
+
 NOVINKY 1.7
 - 🎯 Zákruta na dashboarde: tréning jednej zákruty, meria každý prejazd.
 - Duch najlepšieho kola na mape dashboardu.
