@@ -312,11 +312,14 @@ class TelemetryApp:
         urls = [f"http://{ip}:{port}/buttonbox" for ip in ips]
         wheel = [f"https://{ip}:{self.https_port}/wheel" for ip in ips] if self.https_port else []
         display = [f"http://{ip}:{port}/display" for ip in ips]
+        # QR pre fotoaparát iPhonu: otvorí appku Apex Volant a tá sa pripojí na tento PC
+        app = [f"apextelemetria://{ip}:{port}/wheel" for ip in ips]
 
         def qr(u):
             return segno.make(u[0]).svg_inline(scale=5, dark="#000", light="#fff") if u else ""
         return web.json_response({"urls": urls, "qr": qr(urls), "wheel_urls": wheel,
                                   "wheel_qr": qr(wheel), "display_urls": display, "display_qr": qr(display),
+                                  "app_urls": app, "app_qr": qr(app),
                                   "pad": self.pad.status(),
                                   "local": is_local(request),
                                   "sources": {sid: c.name for sid, c in SOURCES.items()}})

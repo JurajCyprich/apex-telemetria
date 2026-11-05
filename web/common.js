@@ -76,6 +76,13 @@ function toast(text) {
 
 // Tlačidlo celej obrazovky (+ kláves F). Počas celej obrazovky drží displej zapnutý.
 function setupFullscreen(btn) {
+  // v appke je celá obrazovka vždy – tlačidlo vráti na výber PC a stránky
+  if (window.webkit?.messageHandlers?.apex) {
+    btn.textContent = "⌂";
+    btn.title = "Späť na výber PC";
+    btn.addEventListener("click", () => window.webkit.messageHandlers.apex.postMessage({ t: "home" }));
+    return { enter: () => Promise.resolve() };
+  }
   const el = document.documentElement;
   const request = el.requestFullscreen || el.webkitRequestFullscreen;
   const exit = document.exitFullscreen || document.webkitExitFullscreen;
@@ -184,8 +191,12 @@ function drawTrack(ctx, w, h, points, style = {}) {
 const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
   || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 const CAN_VIBRATE = typeof navigator.vibrate === "function";
+// appka Apex Volant pre iPhone (WebView): vie naozaj vibrovať, posiela náklon mobilu a drží celú obrazovku
+const NATIVE = window.webkit?.messageHandlers?.apex || null;
+function native(msg) { try { NATIVE?.postMessage(msg); } catch { /* nič */ } }
 let _hapLabel = null;
 function haptic(ms = 15) {
+  if (NATIVE) { native({ t: "tap", ms }); return; }
   if (CAN_VIBRATE) { navigator.vibrate(ms); return; }
   if (!IS_IOS) return;
   try {

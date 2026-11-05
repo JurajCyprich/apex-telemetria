@@ -1,7 +1,7 @@
 // Volant na mobile: náklon mobilu = zatáčanie, posuvníky = plyn/brzda, posiela sa ako Xbox ovládač.
 const $ = (id) => document.getElementById(id);
 const STYLES = { f1: "F1 – LED svetlá", gt: "GT – pruh otáčok", analog: "Analógový otáčkomer", minimal: "Minimal" };
-const DEFAULTS = { style: "f1", curve: 1, vibrate: true, rumble: true, rumbleGain: 100, rumbleFx: !CAN_VIBRATE };
+const DEFAULTS = { style: "f1", curve: 1, vibrate: true, rumble: true, rumbleGain: 100, rumbleFx: !CAN_VIBRATE && !NATIVE };
 // nastavenia zatáčania – každá hra má vlastný profil, prepína sa podľa telemetrie
 const STEER_DEFAULTS = { range: 90, dead: 1, anti: 0, lin: 1, smooth: 40, invert: false };
 const GENERIC = "Všeobecný";
@@ -96,6 +96,7 @@ function releaseAll() {
   input.btn.clear();
   rumbleLevel = 0;
   navigator.vibrate?.(0);
+  nativeRumble(0);
   showRumbleFx(0);
 }
 
@@ -151,6 +152,13 @@ function onOrientation(e) {
   const g = e.gamma * RAD;
   onUpVector(-Math.cos(b) * Math.sin(g), Math.sin(b), 0.3, performance.now());
 }
+
+// appka Apex Volant posiela náklon sama (gyroskop + akcelerometer zo systému), 60× za sekundu
+window.apexMotion = (x, y) => {
+  lastOrientation = performance.now();
+  sensor = "gyroskop (appka)";
+  onUpVector(x, y, 0.3, lastOrientation);
+};
 
 function onMotion(e) {
   if (performance.now() - lastOrientation < 500) return;  // gyroskop funguje – akcelerometer netreba
@@ -372,11 +380,22 @@ padErr.addEventListener("click", () => { padErr.hidden = true; });
 const canVibrate = CAN_VIBRATE;
 let rumbleLevel = 0;
 let rumbleTick = 0;
+let nativeSent = -1;
+// appka: plynulá vibrácia, posielame len pri zmene sily
+function nativeRumble(level, sharp = 0.3) {
+  if (!NATIVE) return;
+  const l = level < 0.03 ? 0 : Math.round(level * 50) / 50;
+  if (l === nativeSent) return;
+  nativeSent = l;
+  native({ t: "rumble", l, s: sharp });
+}
 function setRumble(large, small) {
   // veľký motor = hrubé otrasy (obrubníky, náraz), malý = jemné (šmyk, ABS) – malý berieme slabšie
   const level = Math.max(large, small * 0.7) / 255;
   rumbleLevel = cfg.rumble ? Math.min(1, level * cfg.rumbleGain / 100) : 0;
   if (rumbleLevel < 0.03 && canVibrate) navigator.vibrate(0);
+  // prevaha malého motora = ostrejšia vibrácia
+  nativeRumble(running ? rumbleLevel : 0, large + small > 0 ? small / (large + small) : 0.3);
   showRumbleFx(rumbleLevel);
 }
 function showRumbleFx(level) {
@@ -387,6 +406,7 @@ function showRumbleFx(level) {
 setInterval(() => {
   if (!running || document.visibilityState !== "visible" || rumbleLevel < 0.03) return;
   if (canVibrate) { navigator.vibrate(Math.round(12 + 88 * rumbleLevel)); return; }
+  if (NATIVE) return;  // appka vibruje plynulo sama
   // iPhone: ťuknutie každých 300 ms pri slabých vibráciách až každých 100 ms pri najsilnejších
   rumbleTick += 100;
   if (IS_IOS && rumbleTick >= 300 - 200 * rumbleLevel) { rumbleTick = 0; haptic(); }
@@ -396,6 +416,22 @@ setInterval(() => {
 const fs = setupFullscreen($("fs"));
 
 $("go").addEventListener("click", async () => {
+  if (NATIVE) {
+    // appka: náklon posiela sama, obrazovku zamkne na šírku a drží ju zapnutú
+    native({ t: "start" });
+  } else {
+    await startBrowserSensors();
+  }
+  center = null;
+  running = true;
+  document.body.classList.add("running");
+  $("start").hidden = true;
+  setTimeout(() => {
+    if (rawAngle === null) toast("Mobil neposiela dáta z gyroskopu – zatáčanie nebude fungovať");
+  }, 2000);
+});
+
+async function startBrowserSensors() {
   // iOS: povolenie senzorov sa musí vyžiadať priamo z kliknutia (obe naraz, pred prvým await)
   const asks = [window.DeviceOrientationEvent, window.DeviceMotionEvent]
     .filter((E) => E && typeof E.requestPermission === "function")
@@ -407,14 +443,7 @@ $("go").addEventListener("click", async () => {
   window.addEventListener("devicemotion", onMotion);
   // nečakáme – niektoré prehliadače na celú obrazovku nikdy neodpovedia
   fs.enter().then(() => screen.orientation?.lock?.("landscape")).catch(() => { /* nie všade sa dá */ });
-  center = null;
-  running = true;
-  document.body.classList.add("running");
-  $("start").hidden = true;
-  setTimeout(() => {
-    if (rawAngle === null) toast("Mobil neposiela dáta z gyroskopu – zatáčanie nebude fungovať");
-  }, 2000);
-});
+}
 
 $("calib").addEventListener("click", () => { calibrate(); toast("Stred volantu nastavený"); });
 
@@ -452,7 +481,7 @@ function fillSettings() {
   $("sVibrate").checked = cfg.vibrate;
   $("sRumble").checked = cfg.rumble;
   $("sRumbleFx").checked = cfg.rumbleFx;
-  $("noRumble").hidden = canVibrate;
+  $("noRumble").hidden = canVibrate || !!NATIVE;
   showValues();
   drawCurve();
 }
@@ -514,6 +543,7 @@ $("sRumbleFx").addEventListener("change", (e) => {
 $("testRumble").addEventListener("click", () => {
   // test priamo z ťuknutia – ukáže, či tento mobil vibrácie/ťuknutia vôbec zvláda
   if (canVibrate) { navigator.vibrate([80, 60, 80, 60, 160]); return; }
+  if (NATIVE) { native({ t: "test" }); return; }
   haptic();
   [150, 300, 450].forEach((t) => setTimeout(haptic, t));
   showRumbleFx(1); document.body.classList.add("rumbling");
@@ -529,7 +559,7 @@ document.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("cli
 $("setModal").addEventListener("click", (e) => { if (e.target === e.currentTarget) e.currentTarget.classList.remove("open"); });
 
 // gyroskop v prehliadači funguje len cez HTTPS – ponúkneme zabezpečenú adresu
-if (!window.isSecureContext) {
+if (!window.isSecureContext && !NATIVE) {
   getJSON("/api/info").then((info) => {
     const port = info.wheel_urls?.[0] ? new URL(info.wheel_urls[0]).port : null;
     $("startBody").innerHTML = port

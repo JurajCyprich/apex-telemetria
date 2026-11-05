@@ -31,6 +31,16 @@ MOBIL (rovnaká Wi-Fi ako PC)
   3. V hre nastav ovládanie na Xbox ovládač: zatáčanie = ľavá páčka, plyn = RT, brzda = LT,
      radenie = RB / LB.
 
+APPKA PRE IPHONE (Apex Volant) – naozajstné vibrácie, celá obrazovka, obrazovka sa neotáča
+1. Stiahni ApexVolant.ipa z github.com/JurajCyprich/apex-telemetria/releases a program Sideloadly
+   zo sideloadly.io (na Windows potrebuje iTunes – ak chýba, navedie ťa).
+2. Pripoj iPhone káblom, odomkni ho a potvrď „Dôverovať tomuto počítaču“.
+3. V Sideloadly vyber ApexVolant.ipa, zadaj Apple ID a daj Start.
+4. iPhone: Nastavenia → Súkromie a bezpečnosť → Režim vývojára → zapnúť (reštart).
+   Nastavenia → Všeobecné → Správa VPN a zariadení → tvoje Apple ID → Dôverovať.
+5. Na PC „📱 Mobil“ → fotoaparátom iPhonu naskenuj QR „Appka pre iPhone“. Povoľ miestnu sieť.
+- S bezplatným Apple ID appka platí 7 dní, potom ju v Sideloadly nainštaluj znova.
+
 STREET VIEW (obraz kola)
 - Na dashboarde klikni „🎥 Obraz“ a zapni nahrávanie. Hru prepni na „okno bez okraja“ (borderless),
   exkluzívna celá obrazovka sa často nedá zachytiť.

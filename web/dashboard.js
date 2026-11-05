@@ -338,6 +338,8 @@ $("phoneBtn").onclick = async () => {
   $("displayQr").innerHTML = info.display_qr || "";
   $("displayQr").style.display = info.display_qr ? "" : "none";
   $("displayUrls").innerHTML = info.display_urls.map((u) => `<a href="${u}" target="_blank">${u}</a>`).join("");
+  $("appQr").innerHTML = info.app_qr || "";
+  $("appQr").style.display = info.app_qr ? "" : "none";
   $("padWarn").hidden = !info.pad.error;
   $("padWarn").textContent = info.pad.error ? `⚠ ${info.pad.error}` : "";
   $("phoneModal").classList.add("open");

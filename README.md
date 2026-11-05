@@ -153,6 +153,37 @@ Funguje pre hry na PC (nie pre GT7 na PlayStation).
 nastavíš v ⚙. Na Androide naozaj vibruje. iPhone stránkam vibrovať nedovolí – volant preto ukáže
 vibrácie na obrazovke (okraj zabliká, palubovka sa zatrasie) a na iOS 17.4 až ~26.4 skúša krátke
 haptické ťuknutia. Tlačidlo *Vyskúšať vibrácie* v ⚙ ukáže, čo tvoj mobil zvláda.
+Naozajstné vibrácie na iPhone dáva appka **Apex Volant** (nižšie).
+
+## Appka pre iPhone
+
+**Apex Volant** je appka pre iPhone (iOS 16 a novší) s volantom, button boxom a displejom z tvojho PC.
+Oproti Safari:
+
+- **naozajstné vibrácie** z hry cez Taptic Engine – plynulé, sila aj ostrosť podľa hry
+  (obrubníky dunia, šmyk bzučí), ťuknutia pri radení a tlačidlách,
+- **celá obrazovka** bez lišty prehliadača, obrazovka nezhasne,
+- obrazovka sa pri zatáčaní **neotáča** (po ▶ Štart sa zamkne na šírku),
+- netreba HTTPS ani potvrdzovať certifikát.
+
+Appka nie je v App Store – nainštaluješ ju zadarmo cez **Sideloadly** so svojím Apple ID:
+
+1. Stiahni `ApexVolant.ipa` z [Releases](https://github.com/JurajCyprich/apex-telemetria/releases/latest)
+   a Sideloadly z [sideloadly.io](https://sideloadly.io). Sideloadly na Windows potrebuje iTunes –
+   keď chýba, pri spustení ťa navedie.
+2. Pripoj iPhone káblom k PC, odomkni ho a potvrď *Dôverovať tomuto počítaču*.
+3. V Sideloadly vyber `ApexVolant.ipa`, zadaj Apple ID a daj **Start**. (Prihlasuje sa priamo u Apple;
+   ak chceš, môžeš použiť aj vedľajšie Apple ID.)
+4. Na iPhone: *Nastavenia → Súkromie a bezpečnosť → Režim vývojára* zapni (iPhone sa reštartuje)
+   a v *Nastavenia → Všeobecné → Správa VPN a zariadení* ťukni na svoje Apple ID → **Dôverovať**.
+5. Na PC otvor **📱 Mobil** a **fotoaparátom iPhonu** naskenuj QR kód **Appka pre iPhone** – appka sa
+   otvorí a pripojí. Pri prvom spustení povoľ prístup k **miestnej sieti**. Adresu PC vieš zadať aj ručne.
+   Tlačidlo **⌂** vráti na výber PC a stránky (volant / button box / displej).
+
+S bezplatným Apple ID appka platí **7 dní** – potom ju v Sideloadly znova nainštaluj (nastavenia ostanú),
+alebo zapni v Sideloadly automatické obnovovanie cez Wi-Fi. S platenou Apple Developer licenciou platí rok.
+Na PC musí byť nainštalovaný ViGEmBus (bod 1 v *Volant na mobile*), rovnako ako pri volante v prehliadači.
+Appku stavia GitHub Actions na macOS (`ios/`, Xcode projekt z `ios/project.yml` cez XcodeGen).
 
 ## Štruktúra
 
@@ -168,6 +199,7 @@ server/          Python backend (aiohttp)
   certs.py       vlastný HTTPS certifikát (gyroskop na mobile vyžaduje HTTPS)
   app.py         web server (HTTP 8777 + HTTPS 8778), WebSocket, API
 web/             dashboard, analýza, street view, pokrok, displej, button box, volant (HTML/JS, bez internetu)
+ios/             appka Apex Volant pre iPhone (Swift, WKWebView + vibrácie + náklon z CoreMotion)
 data/            nastavenia, button box profily, kolá, obraz kôl a certifikát (vytvorí sa sám)
 ```
 
