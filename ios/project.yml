@@ -1,0 +1,27 @@
+# Xcode projekt sa generuje z tohto súboru (XcodeGen) – v GitHub Actions na macOS, Mac doma netreba.
+name: ApexVolant
+options:
+  bundleIdPrefix: sk.apextelemetria
+  deploymentTarget:
+    iOS: "16.0"
+targets:
+  ApexVolant:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+      - Resources
+    settings:
+      base:
+        PRODUCT_NAME: ApexVolant
+        PRODUCT_BUNDLE_IDENTIFIER: sk.apextelemetria.volant
+        INFOPLIST_FILE: Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        MARKETING_VERSION: "1.6.0"
+        CURRENT_PROJECT_VERSION: "1"
+        TARGETED_DEVICE_FAMILY: "1"
+        SWIFT_VERSION: "5.0"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGN_IDENTITY: ""

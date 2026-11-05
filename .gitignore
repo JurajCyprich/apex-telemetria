@@ -8,3 +8,9 @@ __pycache__/
 # osobné dáta: kolá, nastavenia a súkromný kľúč HTTPS certifikátu
 data/
 .claude/
+
+# iPhone appka (generuje sa pri zostavení)
+ios/build/
+ios/*.xcodeproj/
+ios/Payload/
+*.ipa
