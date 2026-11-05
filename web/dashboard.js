@@ -76,6 +76,18 @@ function drawMap() {
       if (hi) { ctx.fillStyle = "#ffd60a"; ctx.textAlign = "left"; ctx.fillText(`${b.speed} km/h`, px + 10, py - 6); ctx.textAlign = "center"; }
     }
   }
+  // duch: kde by v tomto čase kola bolo tvoje najlepšie kolo
+  if (project && mapPoints.length > 20 && last.ghost) {
+    const [gx, gy] = project(last.ghost[0], last.ghost[1]);
+    ctx.fillStyle = "rgba(191,90,242,.55)"; ctx.beginPath(); ctx.arc(gx, gy, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#bf5af2"; ctx.lineWidth = 2; ctx.stroke();
+    const g = last.ghost_gap;
+    if (typeof g === "number") {
+      ctx.font = "bold 12px sans-serif"; ctx.textAlign = "left";
+      ctx.fillStyle = g > 0 ? "#ff453a" : "#30d158";
+      ctx.fillText(`Duch najlepšieho kola: ${g > 0 ? `${Math.round(g)} m pred tebou` : `${Math.round(-g)} m za tebou`}`, 8, 16);
+    }
+  }
   if (project && lastPos) {
     const [px, py] = project(lastPos[0], lastPos[1]);
     ctx.fillStyle = "#ff3b30"; ctx.beginPath(); ctx.arc(px, py, 6, 0, Math.PI * 2); ctx.fill();
@@ -204,7 +216,7 @@ setInterval(() => { if (last.connected) drawMap(); }, 100);
 drawMap();
 render();
 
-connectWS((d) => { onFrame(d); engineer.frame(d); }, (msg) => {
+const ws = connectWS((d) => { onFrame(d); engineer.frame(d); training.frame(d); }, (msg) => {
   if (msg.type === "lap") {
     toast(`Kolo ${msg.data.lap} uložené: ${fmtTime(msg.data.time)}`);
     engineer.lap(msg.data);
@@ -212,6 +224,8 @@ connectWS((d) => { onFrame(d); engineer.frame(d); }, (msg) => {
   if (msg.type === "corner_stats") engineer.corner(msg.data);
 });
 engineer.setupUI();
+engineer.setSender((m) => ws.send(m));
+training.setup();
 
 // ---------- nová verzia na GitHube ----------
 getJSON("/api/update").then((u) => {

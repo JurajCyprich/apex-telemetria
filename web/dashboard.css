@@ -105,3 +105,22 @@ a.btn { text-decoration: none; display: inline-block; }
 .fuel h3 .btn { text-transform: none; letter-spacing: 0; }
 .row2i { display: flex; gap: 6px; align-items: center; } .row2i input { width: 100%; min-width: 0; }
 [hidden] { display: none !important; }
+
+/* tréning zákruty */
+.tr-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; margin: 10px 0; }
+.tr-pick { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }
+.tr-pick small { font-size: 11px; }
+#trBtn.on { background: var(--purple); color: #000; border-color: var(--purple); }
+.tr-panel { position: fixed; right: 16px; bottom: 16px; width: min(380px, calc(100vw - 32px)); z-index: 50;
+  box-shadow: 0 10px 30px #000c; border-color: var(--purple); }
+.tr-head { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+.tr-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.tr-stats div { display: flex; flex-direction: column; }
+.tr-stats small { color: var(--muted); font-size: 11px; }
+.tr-stats b { font-size: 18px; }
+.tr-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 6px; }
+.tr-table th, .tr-table td { padding: 3px 6px; text-align: right; border-bottom: 1px solid var(--line); }
+.tr-table th { color: var(--muted); font-weight: 500; }
+.tr-table td:first-child, .tr-table th:first-child { text-align: left; }
+.tr-table td { font-family: var(--mono); }
+.tr-table tr.best td { color: var(--green); }

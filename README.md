@@ -86,6 +86,19 @@ Bez hry si to môžeš vyskúšať: **⚙ Nastavenia → Demo (simulácia bez hr
 - **Overlay pre OBS** – ľubovoľný displej na adrese `/overlay?l=…` s priehľadným pozadím
   (tlačidlo **📺 OBS** na displeji skopíruje adresu). V OBS: *Zdroj → Prehliadač*, 1920×1080.
   Hotová šablóna *Stream (OBS)*.
+- **Duch najlepšieho kola** – na mape dashboardu fialová bodka ukazuje, kde by v tomto čase bolo tvoje
+  najlepšie kolo, a o koľko metrov ťa predbieha alebo zaostáva.
+- **Tréning zákruty** (🎯 Zákruta) – vyberieš zákrutu, ktorá ti nejde, a pri každom prejazde sa zmeria len ona:
+  čas úseku, brzdenie oproti najlepšiemu, najnižšia rýchlosť a výjazd. Inžinier hneď povie, či to bolo lepšie.
+- **Rady k nastaveniu auta** – v analýze kôl: kde auto pri vjazde, v strede a na výjazde zo zákruty nedotáča
+  alebo pretáča, kde blokujú a kde sa pretáčajú kolesá – a čo zmeniť (brzdy, stabilizátory, krídla, TC,
+  diferenciál, jazda). Vyváženie z uhlov sklzu kolies: AC, ACC, F1, Forza; blokovanie a pretáčanie
+  aj RaceRoom a GT7. Platí pre kolá odjazdené od verzie 1.7.
+- **Preteky s inžinierom** – odstupy po kole aj s trendom („dobiehaš 0,3 za kolo“, „približuje sa“), zmena
+  pozície, súper do sekundy, safety car / VSC, tresty, poškodenie; počasie (ACC, F1): „do desiatich minút začne
+  pršať“, kedy prezuť na dažďové alebo suché gumy.
+- **Inžinier v slúchadlách** – v 🔊 Inžinier zvoľ *Kde hovoriť: mobil* a hlásenia prečíta volant na mobile
+  (appka Apex Volant aj stránka volantu), napríklad do AirPods.
 - **Kontrola aktualizácií** – pri štarte sa pozrie na GitHub; keď je nová verzia, dashboard ukáže
   pruh s tlačidlom **⬇ Aktualizovať teraz** – aplikácia (`.exe`) si novú verziu stiahne, vymení sa
   a spustí sa znova. Kolá a nastavenia ostanú.
@@ -150,7 +163,9 @@ Ak mobil stratí spojenie (zamknutie, Wi-Fi), PC ovládač do 0,4 s vynuluje –
 Funguje pre hry na PC (nie pre GT7 na PlayStation).
 
 **Vibrácie z hry:** keď hra rozvibruje ovládač (obrubníky, šmyk, náraz), zavibruje mobil. Silu
-nastavíš v ⚙. Na Androide naozaj vibruje. iPhone stránkam vibrovať nedovolí – volant preto ukáže
+nastavíš v ⚙. Navyše **vibrácie z telemetrie** – mobil vibruje podľa toho, čo sa deje s autom, aj v hrách,
+ktoré virtuálny ovládač nerozvibrujú: obrubník (dunenie), tráva a štrk, zablokované kolesá (ostré bzučanie),
+pretáčanie kolies, pulzy ABS, obmedzovač otáčok a náraz. Na Androide naozaj vibruje. iPhone stránkam vibrovať nedovolí – volant preto ukáže
 vibrácie na obrazovke (okraj zabliká, palubovka sa zatrasie) a na iOS 17.4 až ~26.4 skúša krátke
 haptické ťuknutia. Tlačidlo *Vyskúšať vibrácie* v ⚙ ukáže, čo tvoj mobil zvláda.
 Naozajstné vibrácie na iPhone dáva appka **Apex Volant** (nižšie).

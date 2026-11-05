@@ -31,6 +31,15 @@ MOBIL (rovnaká Wi-Fi ako PC)
   3. V hre nastav ovládanie na Xbox ovládač: zatáčanie = ľavá páčka, plyn = RT, brzda = LT,
      radenie = RB / LB.
 
+NOVINKY 1.7
+- 🎯 Zákruta na dashboarde: tréning jednej zákruty, meria každý prejazd.
+- Duch najlepšieho kola na mape dashboardu.
+- Analýza kôl → Nastavenie auta: kde auto nedotáča / pretáča a čo zmeniť.
+- Inžinier: odstupy a trend, pozícia, safety car, tresty, poškodenie, počasie.
+  V 🔊 Inžinier → Kde hovoriť → mobil: hlásenia pôjdu z volantu na mobile (slúchadlá).
+- Volant: vibrácie z telemetrie (obrubníky, zablokované kolesá, ABS, pretáčanie, obmedzovač).
+  Na iPhone treba appku Apex Volant 1.7 (v Sideloadly nainštaluj nový ApexVolant.ipa).
+
 APPKA PRE IPHONE (Apex Volant) – naozajstné vibrácie, celá obrazovka, obrazovka sa neotáča
 1. Stiahni ApexVolant.ipa z github.com/JurajCyprich/apex-telemetria/releases a program Sideloadly
    zo sideloadly.io (na Windows potrebuje iTunes – ak chýba, navedie ťa).

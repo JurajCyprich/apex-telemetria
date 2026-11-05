@@ -4,7 +4,8 @@ import WebKit
 
 /// Jedna obrazovka: výber PC (adresa + stránka) a pod ňou celoobrazovkový WebView so stránkou z PC.
 /// Stránka (wheel.js / common.js) volá appku cez window.webkit.messageHandlers.apex.postMessage({t: …}):
-///   tap {ms}, rumble {l, s}, test, start (volant beží – zamkni obrazovku, posielaj náklon), home (späť na výber)
+///   tap {ms}, rumble {l, s}, test, start (volant beží – zamkni obrazovku, posielaj náklon), home (späť na výber),
+///   say {text, lang, rate, urgent} (hlas inžiniera z PC)
 /// Appka posiela náklon mobilu do stránky: window.apexMotion(x, y) – smer "hore" v súradniciach mobilu.
 final class RootController: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, WKUIDelegate,
     UITextFieldDelegate {
@@ -24,6 +25,7 @@ final class RootController: UIViewController, WKScriptMessageHandler, WKNavigati
     private let spinner = UIActivityIndicatorView(style: .medium)
     private let motion = CMMotionManager()
     private let haptics = Haptics()
+    private let speech = Speech()
     private let store = UserDefaults.standard
 
     private var showingWeb = false
@@ -259,6 +261,7 @@ final class RootController: UIViewController, WKScriptMessageHandler, WKNavigati
         if !on {
             stopMotion()
             haptics.stop()
+            speech.stop()
             unlockOrientation()
             if web.url?.scheme == "http" { web.loadHTMLString("", baseURL: nil) }
         }
@@ -309,6 +312,11 @@ final class RootController: UIViewController, WKScriptMessageHandler, WKNavigati
         case "tap": haptics.tap(ms: num("ms", 15))
         case "rumble": haptics.rumble(level: num("l", 0), sharp: num("s", 0.3))
         case "test": haptics.test()
+        case "say":
+            if let text = d["text"] as? String, !text.isEmpty {
+                speech.say(text, lang: d["lang"] as? String ?? "sk", rate: num("rate", 1),
+                           urgent: (d["urgent"] as? Bool) ?? false)
+            }
         case "start":
             motionWanted = true
             startMotion()

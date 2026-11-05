@@ -1,7 +1,8 @@
 // Volant na mobile: náklon mobilu = zatáčanie, posuvníky = plyn/brzda, posiela sa ako Xbox ovládač.
 const $ = (id) => document.getElementById(id);
 const STYLES = { f1: "F1 – LED svetlá", gt: "GT – pruh otáčok", analog: "Analógový otáčkomer", minimal: "Minimal" };
-const DEFAULTS = { style: "f1", curve: 1, vibrate: true, rumble: true, rumbleGain: 100, rumbleFx: !CAN_VIBRATE && !NATIVE };
+const DEFAULTS = { style: "f1", curve: 1, vibrate: true, rumble: true, rumbleGain: 100, rumbleFx: !CAN_VIBRATE && !NATIVE,
+  fx: true, say: true };
 // nastavenia zatáčania – každá hra má vlastný profil, prepína sa podľa telemetrie
 const STEER_DEFAULTS = { range: 90, dead: 1, anti: 0, lin: 1, smooth: 40, invert: false };
 const GENERIC = "Všeobecný";
@@ -358,6 +359,7 @@ window.addEventListener("resize", render);
 const padErr = $("padErr");
 ws = connectWS((d) => {
   frame = d;
+  telemetryFx(d);
   if (d.connected && d.game) useProfile(d.game);
   $("dot").className = `dot ${d.connected ? (d.paused ? "pause" : "on") : ""}`;
   $("status").textContent = d.offline ? "Odpojené od PC" : d.connected
@@ -366,12 +368,29 @@ ws = connectWS((d) => {
 }, (msg) => {
   if (msg.type === "rumble") {
     setRumble(msg.l, msg.s);
+  } else if (msg.type === "say") {
+    sayHere(msg);
   } else if (msg.type === "pad_status") {
     padErr.hidden = !msg.error;
     padErr.textContent = msg.error ? `⚠ ${msg.error} (ťukni pre skrytie)` : "";
   }
 });
 padErr.addEventListener("click", () => { padErr.hidden = true; });
+
+// hlas inžiniera z PC: appka číta systémovým hlasom iOS (ide aj do AirPods), prehliadač cez speechSynthesis
+function sayHere(m) {
+  if (!cfg.say || !running || !m.text) return;
+  if (NATIVE) { native({ t: "say", text: m.text, lang: m.lang, rate: m.rate, urgent: m.urgent }); return; }
+  if (!("speechSynthesis" in window)) return;
+  if (m.urgent) speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(m.text);
+  u.lang = m.lang === "en" ? "en-US" : "sk-SK";
+  const v = speechSynthesis.getVoices().find((x) => x.lang.toLowerCase().startsWith(m.lang === "en" ? "en" : "sk"))
+    || speechSynthesis.getVoices().find((x) => m.lang !== "en" && x.lang.toLowerCase().startsWith("cs"));
+  if (v) u.voice = v;
+  u.rate = m.rate || 1;
+  speechSynthesis.speak(u);
+}
 
 // ---------- vibrácie z hry (hra rozvibruje Xbox ovládač -> zavibruje mobil) ----------
 // Android: mobil nevie meniť silu vibrácie, len jej dĺžku – silu prevedieme na dĺžku pulzu každých 100 ms.
@@ -389,14 +408,49 @@ function nativeRumble(level, sharp = 0.3) {
   nativeSent = l;
   native({ t: "rumble", l, s: sharp });
 }
+let gameLevel = 0, gameSharp = 0.3;          // vibrácie z hry (hra rozvibruje Xbox ovládač)
+let fxLevel = 0, fxSharp = 0.3, fxAbs = false;  // vibrácie z telemetrie (čo sa deje s autom)
 function setRumble(large, small) {
   // veľký motor = hrubé otrasy (obrubníky, náraz), malý = jemné (šmyk, ABS) – malý berieme slabšie
-  const level = Math.max(large, small * 0.7) / 255;
-  rumbleLevel = cfg.rumble ? Math.min(1, level * cfg.rumbleGain / 100) : 0;
-  if (rumbleLevel < 0.03 && canVibrate) navigator.vibrate(0);
+  gameLevel = cfg.rumble ? Math.max(large, small * 0.7) / 255 : 0;
   // prevaha malého motora = ostrejšia vibrácia
-  nativeRumble(running ? rumbleLevel : 0, large + small > 0 ? small / (large + small) : 0.3);
+  gameSharp = large + small > 0 ? small / (large + small) : 0.3;
+  mixRumble();
+}
+function mixRumble() {
+  rumbleLevel = Math.min(1, Math.max(gameLevel, fxLevel) * cfg.rumbleGain / 100);
+  if (rumbleLevel < 0.03 && canVibrate) navigator.vibrate(0);
+  nativeRumble(running ? rumbleLevel : 0, fxLevel > gameLevel ? fxSharp : gameSharp);
   showRumbleFx(rumbleLevel);
+}
+
+// vibrácie z telemetrie: silnejší vnem vyhráva; ostrosť rozlíši obrubník (dunenie) od blokovania (bzučanie)
+let lastG = null, impactAt = 0;
+function telemetryFx(d) {
+  let lvl = 0, sharp = 0.3;
+  const add = (l, s) => { if (l > lvl) { lvl = l; sharp = s; } };
+  fxAbs = false;
+  if (cfg.fx && running && d.connected && !d.paused) {
+    if (d.fx_kerb > 0) add(0.35 + 0.5 * d.fx_kerb, 0.15);
+    if (d.fx_rough > 0) add(0.25 + 0.35 * d.fx_rough, 0);
+    if (d.fx_lock > 0) add(0.45 + 0.55 * d.fx_lock, 0.9);
+    if (d.fx_spin > 0) add(0.3 + 0.45 * d.fx_spin, 0.65);
+    if (d.max_rpm && d.gear > 0 && d.rpm >= d.max_rpm * 0.985) add(0.22, 1);  // obmedzovač otáčok
+    fxAbs = d.fx_abs > 0.3;
+    // náraz: prudká zmena preťaženia medzi dvoma rámcami
+    const g = [d.g_lat || 0, d.g_lon || 0];
+    const now = performance.now();
+    if (lastG && Math.hypot(g[0] - lastG[0], g[1] - lastG[1]) > 2.5 && now - impactAt > 600) {
+      impactAt = now;
+      haptic(45);
+    }
+    lastG = g;
+  } else {
+    lastG = null;
+  }
+  fxLevel = lvl;
+  fxSharp = sharp;
+  mixRumble();
 }
 function showRumbleFx(level) {
   const on = level >= 0.03 && cfg.rumbleFx && running;
@@ -404,7 +458,13 @@ function showRumbleFx(level) {
   document.body.style.setProperty("--rumble", on ? level.toFixed(2) : "0");
 }
 setInterval(() => {
-  if (!running || document.visibilityState !== "visible" || rumbleLevel < 0.03) return;
+  if (!running || document.visibilityState !== "visible") return;
+  // ABS: rýchle pulzy
+  if (fxAbs) {
+    if (NATIVE) native({ t: "tap", ms: 25 });
+    else if (canVibrate) { navigator.vibrate(35); return; }
+  }
+  if (rumbleLevel < 0.03) return;
   if (canVibrate) { navigator.vibrate(Math.round(12 + 88 * rumbleLevel)); return; }
   if (NATIVE) return;  // appka vibruje plynulo sama
   // iPhone: ťuknutie každých 300 ms pri slabých vibráciách až každých 100 ms pri najsilnejších
@@ -420,6 +480,12 @@ $("go").addEventListener("click", async () => {
     // appka: náklon posiela sama, obrazovku zamkne na šírku a drží ju zapnutú
     native({ t: "start" });
   } else {
+    // Safari / Chrome pustí reč až po ťuknutí – "odomkneme" ju tichou vetou
+    if ("speechSynthesis" in window) {
+      const u = new SpeechSynthesisUtterance(" ");
+      u.volume = 0;
+      speechSynthesis.speak(u);
+    }
     await startBrowserSensors();
   }
   center = null;
@@ -481,6 +547,8 @@ function fillSettings() {
   $("sVibrate").checked = cfg.vibrate;
   $("sRumble").checked = cfg.rumble;
   $("sRumbleFx").checked = cfg.rumbleFx;
+  $("sFx").checked = cfg.fx;
+  $("sSay").checked = cfg.say;
   $("noRumble").hidden = canVibrate || !!NATIVE;
   showValues();
   drawCurve();
@@ -535,6 +603,8 @@ $("sRumble").addEventListener("change", (e) => {
   saveCfg();
   if (!cfg.rumble) setRumble(0, 0);
 });
+$("sFx").addEventListener("change", (e) => { cfg.fx = e.target.checked; saveCfg(); if (!cfg.fx) telemetryFx({}); });
+$("sSay").addEventListener("change", (e) => { cfg.say = e.target.checked; saveCfg(); });
 $("sRumbleFx").addEventListener("change", (e) => {
   cfg.rumbleFx = e.target.checked;
   saveCfg();

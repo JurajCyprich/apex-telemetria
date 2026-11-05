@@ -173,6 +173,7 @@ class TelemetryApp:
         self.clients.add(ws)
         self.held[ws] = {}
         pad_ok = None
+        local = is_local(request)
         try:
             async for msg in ws:
                 if msg.type != WSMsgType.TEXT:
@@ -189,6 +190,16 @@ class TelemetryApp:
                         await self._send(ws, json.dumps({"type": "pad_status", **self.pad.status()}))
                 elif kind == "press":
                     await self._press(ws, data)
+                elif kind == "say" and local:
+                    # hlásenie inžiniera z dashboardu na PC -> prečíta ho volant na mobile (slúchadlá)
+                    rate = data.get("rate")
+                    out = json.dumps({"type": "say", "text": str(data.get("text", ""))[:400],
+                                      "lang": "en" if data.get("lang") == "en" else "sk",
+                                      "urgent": bool(data.get("urgent")),
+                                      "rate": float(rate) if isinstance(rate, (int, float)) else 1.0})
+                    for other in list(self.clients):
+                        if other is not ws:
+                            await self._send(other, out)
         finally:
             self.clients.discard(ws)
             self.pad.neutral(ws)  # odpojený volant -> pustiť plyn

@@ -70,8 +70,56 @@ class Frame:
     gap_behind: Optional[float] = None    # s k autu za tebou
     standings: Optional[list] = None      # [{pos, name, leader, ahead, last, pit, me, lap}] – zatiaľ F1
 
+    # čo cíti auto (0..1) – pre vibrácie mobilu a rady k nastaveniu; len hry, ktoré to posielajú
+    fx_kerb: float = 0.0        # obrubník
+    fx_rough: float = 0.0       # tráva, štrk, mimo trate
+    fx_lock: float = 0.0        # zablokované koleso pri brzdení
+    fx_spin: float = 0.0        # pretáčanie kolies pri plyne
+    fx_abs: float = 0.0         # ABS práve zasahuje
+    lock_axle: int = 0          # 1 = predná náprava, 2 = zadná, 3 = obe
+    balance: Optional[float] = None  # -1..1 v zákrute: + nedotáča (predné kĺžu viac), - pretáča
+
+    # preteky
+    damage: Optional[float] = None   # % najväčšieho poškodenia (krídla, podlaha…)
+    penalty: str = ""                # drive / stopgo / time:5 / warning / lap / dsq …
+    penalty_n: int = 0               # zvýši sa pri každom novom treste (aj keď je rovnaký)
+    safety_car: str = ""             # "SC" / "VSC"
+    rain: Optional[int] = None       # 0 sucho, 1 mrholenie, 2 slabý, 3 stredný, 4 silný dážď, 5 búrka
+    rain_10: Optional[int] = None    # predpoveď o 10 minút
+    rain_30: Optional[int] = None    # predpoveď o 30 minút
+    wet_tyres: Optional[bool] = None
+
     def to_dict(self):
         return asdict(self)
+
+
+def wheel_fx(f, wheel_ms):
+    """Zablokovanie / pretáčanie kolies z obvodovej rýchlosti kolies (m/s, poradie FL FR RL RR)."""
+    f.fx_lock = f.fx_spin = 0.0
+    f.lock_axle = 0
+    v = f.speed / 3.6
+    if v < 5 or not wheel_ms or len(wheel_ms) != 4:
+        return
+    ratios = [(abs(w) - v) / v for w in wheel_ms]
+    if f.brake > 0.05:
+        # do 12 % sklzu je to ešte normálne brzdenie, pri 62 % je koleso prakticky zablokované
+        lock = [max(0.0, -r - 0.12) / 0.5 for r in ratios]
+        front, rear = max(lock[0], lock[1]), max(lock[2], lock[3])
+        f.fx_lock = round(min(1.0, max(front, rear)), 2)
+        if f.fx_lock >= 0.1:
+            f.lock_axle = (1 if front >= 0.1 else 0) | (2 if rear >= 0.1 else 0)
+    if f.throttle > 0.1:
+        # v pomalej zákrute sa vonkajšie koleso točí rýchlejšie – preto rezerva 15 %
+        f.fx_spin = round(min(1.0, max(0.0, max(ratios) - 0.15) / 0.5), 2)
+
+
+def balance_from(f, front, rear):
+    """Vyváženie v zákrute z priemerného |uhla sklzu| prednej a zadnej nápravy (jednotky nehrajú rolu)."""
+    if abs(f.g_lat) < 0.5 or f.speed < 40:
+        return
+    s = front + rear
+    if s > 1e-6:
+        f.balance = round((front - rear) / s, 3)
 
 
 def r(v, n=1):

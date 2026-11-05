@@ -10,6 +10,9 @@ from pathlib import Path
 log = logging.getLogger("laps")
 
 CHANNELS = ("d", "t", "speed", "throttle", "brake", "gear", "steer", "rpm", "x", "z")
+# správanie auta (len hry, ktoré to posielajú): vyváženie v zákrute, zablokované kolesá (1 predné,
+# 2 zadné, 3 obe), pretáčanie kolies 0..1, bočné preťaženie
+FEEL = ("bal", "lk", "sp", "gl")
 
 
 def _safe(s):
@@ -258,7 +261,8 @@ class LapRecorder:
         self.pending = None
 
     def _reset_lap(self, frame, valid_start=False):
-        self.samples = {c: [] for c in CHANNELS}
+        self.samples = {c: [] for c in CHANNELS + FEEL}
+        self._feel = [0.0, 0, 0, 0.0]  # súčet vyváženia, počet, zablokovanie, pretáčanie od poslednej vzorky
         self.corners_done = set()
         self.valid_start = valid_start
         self.dist = 0.0
@@ -359,12 +363,23 @@ class LapRecorder:
         lap_t = f.lap_time if f.lap_time > 0 else self.timer
         self.cur = (self.seq, d, lap_t)
         s = self.samples
+        fe = self._feel
+        if f.balance is not None:
+            fe[0] += f.balance
+            fe[1] += 1
+        fe[2] |= f.lock_axle
+        fe[3] = max(fe[3], f.fx_spin)
         if not s["d"] or d - s["d"][-1] >= 1.0:
             if s["d"] and d < s["d"][-1] - 200:
                 self.valid_start = False  # skok dozadu (reset na box) - kolo neplatné
             for c, v in zip(CHANNELS, (d, lap_t, f.speed, f.throttle, f.brake, f.gear, f.steer,
                                        f.rpm, f.pos_x, f.pos_z)):
                 s[c].append(round(v, 3))
+            s["bal"].append(round(fe[0] / fe[1], 3) if fe[1] else None)
+            s["lk"].append(fe[2])
+            s["sp"].append(round(fe[3], 2))
+            s["gl"].append(round(f.g_lat, 2))
+            self._feel = [0.0, 0, 0, 0.0]
 
         if self.ref:
             rd, rt = self.ref["channels"]["d"], self.ref["channels"]["t"]
@@ -375,9 +390,21 @@ class LapRecorder:
                 extra["delta"] = round(lap_t - ref_t, 3)
                 if d > 200:  # na začiatku kola je predpoveď ešte nespoľahlivá
                     extra["predicted"] = round(self.ref["time"] + extra["delta"], 3)
+            extra.update(self.ghost(lap_t, d))
             extra["corner"] = self.next_corner(d)
             self._coach(d)
         return extra
+
+    def ghost(self, lap_t, d):
+        """Kde by v tomto čase kola bolo najlepšie kolo: poloha na mape a odstup v metroch (+ = pred tebou)."""
+        ch = self.ref["channels"]
+        rt, rd = ch["t"], ch["d"]
+        j = bisect.bisect_left(rt, lap_t)
+        if not (0 < j < len(rt)) or not ch.get("x"):
+            return {}
+        frac = (lap_t - rt[j - 1]) / max(1e-6, rt[j] - rt[j - 1])
+        lerp = lambda arr: arr[j - 1] + frac * (arr[j] - arr[j - 1])  # noqa: E731
+        return {"ghost": [round(lerp(ch["x"]), 1), round(lerp(ch["z"]), 1)], "ghost_gap": round(lerp(rd) - d, 1)}
 
     def _coach(self, d):
         """Po výjazde zo zákruty ju porovná s najlepším kolom (raz za kolo)."""
@@ -422,6 +449,14 @@ class LapRecorder:
             return
         if not self.session_best or lap_time < self.session_best:
             self.session_best = lap_time
+        # hra správanie auta neposiela -> kanály neukladáme
+        if not any(v is not None for v in s.get("bal", [])):
+            s.pop("bal", None)
+        for c in ("lk", "sp"):
+            if not any(s.get(c, [])):
+                s.pop(c, None)
+        if "bal" not in s and "lk" not in s and "sp" not in s:
+            s.pop("gl", None)
         now = datetime.now()
         lap = {"id": now.strftime("%Y%m%d%H%M%S") + f"{now.microsecond // 1000:03d}",
                "game": f.game, "track": f.track or "unknown", "car": f.car or "unknown",

@@ -1,7 +1,7 @@
 """Forza Horizon 5/6 a Forza Motorsport - "Data Out" UDP (formát Dash), predvolený port 5300."""
 import struct
 
-from ..model import Frame
+from ..model import Frame, balance_from
 from .base import UdpSource
 
 SLED = struct.Struct("<iI" + "f" * 15 + "4f4f4f4i4f4f4f4f4f" + "iiiii")  # 232 B
@@ -58,6 +58,19 @@ class ForzaSource(UdpSource):
         gear = d[23]
         f.gear = -1 if gear == 0 else (0 if gear >= 11 else gear)
         f.steer = d[24] / 127
+        # sklz a uhol sklzu sú normalizované: nad 1 = koleso stratilo priľnavosť (poradie FL FR RL RR)
+        ratio, rumble, angle = s[21:25], s[29:33], s[41:45]
+        if f.brake > 0.05:
+            lock = [max(0.0, -r - 0.8) for r in ratio]
+            front, rear = max(lock[0], lock[1]), max(lock[2], lock[3])
+            f.fx_lock = round(min(1.0, max(front, rear)), 2)
+            if f.fx_lock >= 0.1:
+                f.lock_axle = (1 if front >= 0.1 else 0) | (2 if rear >= 0.1 else 0)
+        if f.throttle > 0.1:
+            f.fx_spin = round(min(1.0, max(0.0, max(ratio) - 1.0)), 2)
+        f.fx_kerb = min(1.0, sum(1 for x in rumble if x) / 2)
+        a = [abs(x) for x in angle]
+        balance_from(f, (a[0] + a[1]) / 2, (a[2] + a[3]) / 2)
         if n == 331:
             wear = struct.unpack_from("<4f", data, 311)
             f.tyre_wear = [round((1 - w) * 100, 1) for w in wear]

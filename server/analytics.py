@@ -52,7 +52,8 @@ def analyse(laps):
         return None
     laps.sort(key=lambda l: l["time"])
     ref = laps[0]
-    laps = [l for l in laps[:MAX_LAPS] if _same_layout(ref, l)]
+    every = [l for l in laps if _same_layout(ref, l)]
+    laps = every[:MAX_LAPS]
     rc = ref["channels"]
     corners = find_corners(rc)
     cuts = boundaries(rc, corners)
@@ -87,6 +88,7 @@ def analyse(laps):
     theo = sum(s["best"] for s in segments) + rest
 
     by_id = {l["id"]: l for l in laps}
+    setup = setup_advice(every, corners)
     return {
         "game": ref["game"], "track": ref["track"], "car": ref["car"],
         "laps": len(laps), "ref_id": ref["id"], "ref_time": ref["time"],
@@ -94,6 +96,7 @@ def analyse(laps):
         "segments": segments,
         "brakes": best_brakes(laps, corners),
         "line": best_line(segments, by_id),
+        "setup": setup,
     }
 
 
@@ -153,3 +156,98 @@ def best_line(segments, by_id, step=3.0):
                         round(_interp(ch, "speed", d), 1)])
             d += step
     return out
+
+
+# ---------- rady k nastaveniu auta ----------
+SETUP_LAPS = 15          # posledných 15 kôl, ktoré majú údaje o správaní auta
+UNDER, OVER = 0.2, -0.1  # vyváženie (predné - zadné) / súčet uhlov sklzu: nad = nedotáča, pod = pretáča
+TIPS = {
+    "entry_under": ("Nedotáča pri vjazde do zákruty",
+                    ["Posuň brzdy dozadu o 1–2 %.", "Mäkší predný stabilizátor.",
+                     "Jazda: brzdu povoľuj postupne až do zákruty (trail braking), predok ostane zaťažený."]),
+    "entry_over": ("Pretáča pri vjazde – zadok uteká pri brzdení",
+                   ["Posuň brzdy dopredu o 1–2 %.", "Menej brzdenia motorom, ak ho auto má.",
+                    "Mäkší zadný stabilizátor."]),
+    "mid_under": ("Nedotáča v strede zákruty",
+                  ["Mäkší predný alebo tuhší zadný stabilizátor.",
+                   "Viac predného prítlaku (predné krídlo) alebo menej zadného.", "O trochu nižší tlak predných gúm."]),
+    "mid_over": ("Pretáča v strede zákruty",
+                 ["Tuhší predný alebo mäkší zadný stabilizátor.", "Viac zadného krídla.",
+                  "O trochu nižší tlak zadných gúm."]),
+    "exit_under": ("Nedotáča na výjazde – pri plyne ide auto von",
+                   ["Menšia uzávierka diferenciálu pri plyne.", "Mäkší predný stabilizátor.",
+                    "Jazda: plyn pridávaj až pri narovnávaní volantu."]),
+    "exit_over": ("Pretáča na výjazde – zadok uteká na plyne",
+                  ["Vyššie TC.", "Mäkšie zadné pružiny alebo zadný stabilizátor.",
+                   "Menšia uzávierka diferenciálu pri plyne.", "Jazda: plyn pridávaj plynulejšie."]),
+    "lock_front": ("Blokujú predné kolesá pri brzdení",
+                   ["Posuň brzdy dozadu o 1–2 %.", "Vyššie ABS alebo nižší tlak v brzdách.",
+                    "Jazda: brzdi naplno na rovno a v zákrute brzdu postupne povoľ."]),
+    "lock_rear": ("Blokujú zadné kolesá pri brzdení",
+                  ["Posuň brzdy dopredu o 1–2 %.", "Menej brzdenia motorom.",
+                   "Jazda: podraďuj až keď auto spomalí."]),
+    "spin": ("Pretáčajú sa kolesá na výjazde",
+             ["Vyššie TC.", "Jemnejšia mapa motora alebo dlhší prevod.", "Jazda: plyn pridávaj postupne."]),
+}
+
+
+def _window(ch, key, a, b):
+    d, v = ch["d"], ch.get(key) or []
+    lo, hi = bisect.bisect_left(d, a), bisect.bisect_right(d, b)
+    return v[lo:hi]
+
+
+def setup_advice(laps, corners):
+    """Kde a ako auto nedotáča / pretáča, kde blokujú alebo sa pretáčajú kolesá – a čo s tým.
+
+    Používa kanály bal / lk / sp z posledných kôl (hry, ktoré ich posielajú: AC, ACC, F1, Forza; blokovanie
+    a pretáčanie aj RaceRoom a GT7)."""
+    feel = [l for l in laps if any(k in l["channels"] for k in ("bal", "lk", "sp"))]
+    if not feel or not corners:
+        return None
+    feel.sort(key=lambda l: l["id"], reverse=True)
+    feel = feel[:SETUP_LAPS]
+    out, issues = [], {}
+    for i, c in enumerate(corners):
+        apex = c["d"]
+        nxt = corners[i + 1]["brake_d"] if i + 1 < len(corners) else apex + 200
+        phases = {"entry": (c["brake_d"], apex - 10), "mid": (apex - 10, apex + 10),
+                  "exit": (apex + 10, min(apex + 80, max(apex + 20, nxt)))}
+        row = {"n": c["n"]}
+        found = []
+        for name, (a, b) in phases.items():
+            vals = [v for l in feel for v in _window(l["channels"], "bal", a, b) if v is not None]
+            if len(vals) < 5:
+                row[name] = None
+                continue
+            avg = sum(vals) / len(vals)
+            row[name] = round(avg, 2)
+            if avg > UNDER:
+                found.append(f"{name}_under")
+            elif avg < OVER:
+                found.append(f"{name}_over")
+        locks = [l for l in feel if any(_window(l["channels"], "lk", c["brake_d"] - 20, apex + 10))]
+        axle = 0
+        for l in locks:
+            for v in _window(l["channels"], "lk", c["brake_d"] - 20, apex + 10):
+                axle |= v
+        row["lock"] = round(len(locks) / len(feel), 2)
+        row["lock_axle"] = axle
+        if row["lock"] >= 0.3:
+            if axle & 1:
+                found.append("lock_front")
+            if axle & 2:
+                found.append("lock_rear")
+        a, b = phases["exit"]
+        spins = [l for l in feel if max(_window(l["channels"], "sp", a, b) or [0]) >= 0.3]
+        row["spin"] = round(len(spins) / len(feel), 2)
+        if row["spin"] >= 0.3:
+            found.append("spin")
+        row["issues"] = found
+        out.append(row)
+        for k in found:
+            issues.setdefault(k, []).append(c["n"])
+    tips = [{"key": k, "title": TIPS[k][0], "tips": TIPS[k][1], "corners": ns}
+            for k, ns in sorted(issues.items(), key=lambda kv: -len(kv[1]))]
+    has_bal = any("bal" in l["channels"] for l in feel)
+    return {"laps": len(feel), "balance": has_bal, "corners": out, "tips": tips[:5]}

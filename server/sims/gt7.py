@@ -6,7 +6,7 @@ import socket
 import struct
 import time
 
-from ..model import Frame
+from ..model import Frame, wheel_fx
 from .base import UdpSource
 
 KEY = b"Simulator Interface Packet GT7 ver 0.0"[:32]
@@ -125,6 +125,10 @@ class GT7Source(UdpSource):
         f.tc = 1 if flags & (1 << 11) else 0  # TCS práve zasahuje
         car_code = struct.unpack_from("<i", d, 0x124)[0]
         f.car = f"Auto #{car_code}"
+        rps = struct.unpack_from("<4f", d, 0xA4)
+        radius = struct.unpack_from("<4f", d, 0xB4)
+        if all(0.1 < r < 1.0 for r in radius):
+            wheel_fx(f, [abs(w) * r for w, r in zip(rps, radius)])
         f.track = "GT7"
 
         # GT7 neposiela čas aktuálneho kola - počítame ho z čísla paketu (60 Hz)

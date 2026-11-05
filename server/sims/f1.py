@@ -2,7 +2,7 @@
 import struct
 import time
 
-from ..model import Frame
+from ..model import Frame, balance_from, wheel_fx
 from .base import UdpSource
 
 HEADER = struct.Struct("<HBBBBBQfIIBB")  # 29 B
@@ -15,6 +15,14 @@ TELEMETRY = struct.Struct("<HfffBbHBBH4H4B4BH4f4B")  # 60 B
 STATUS = struct.Struct("<BBBBBfffHHBBHBBBbfffBfffB")  # 55 B
 
 PKT_MOTION, PKT_SESSION, PKT_LAP, PKT_PARTICIPANTS, PKT_TELEMETRY, PKT_STATUS, PKT_DAMAGE = 0, 1, 2, 4, 6, 7, 10
+PKT_EVENT, PKT_MOTION_EX = 3, 13
+# povrch pod kolesom: 1 obrubník, 11 vrúbkovaný obrubník; 3-9 kamene, štrk, blato, piesok, tráva, voda, dlažba
+KERB_SURFACES = {1, 11}
+ROUGH_SURFACES = {3, 4, 5, 6, 7, 9}
+# počasie F1 (0 jasno, 1 polojasno, 2 zamračené, 3 slabý dážď, 4 silný dážď, 5 búrka) -> 0..5 ako ACC
+F1_RAIN = {0: 0, 1: 0, 2: 0, 3: 3, 4: 4, 5: 5}
+F1_PENALTY = {0: "drive", 1: "stopgo", 2: "grid", 4: "time", 5: "warning", 6: "dsq", 10: "lap", 11: "lap",
+              12: "lap", 13: "lap", 14: "lap", 15: "lap", 17: "black"}
 
 TRACKS = {
     0: "Melbourne", 1: "Paul Ricard", 2: "Shanghai", 3: "Bahrajn", 4: "Barcelona", 5: "Monako",
@@ -46,6 +54,7 @@ class F1Source(UdpSource):
         self.frame = Frame(source=self.id, game=self.name, connected=True)
         self.names = {}    # index auta -> meno jazdca (paket Participants)
         self.numbers = {}  # index auta -> štartové číslo
+        self.fmt = 2025
 
     def on_packet(self, data, addr):
         if len(data) < HEADER.size:
@@ -56,6 +65,7 @@ class F1Source(UdpSource):
             return
         f = self.frame
         f.game = f"F1 {year}" if year else self.name
+        self.fmt = fmt
         off = HEADER.size
         if pid == PKT_TELEMETRY:
             self._telemetry(data, off + player * TELEMETRY.size)
@@ -73,8 +83,17 @@ class F1Source(UdpSource):
             self._session(data, off)
         elif pid == PKT_DAMAGE:
             size = (len(data) - off) // NUM_CARS
-            wear = struct.unpack_from("<4f", data, off + player * size)
+            o = off + player * size
+            wear = struct.unpack_from("<4f", data, o)
             f.tyre_wear = _fl(wear, lambda w: 100 - w)
+            # krídla, podlaha, difúzor, bočnice (F1 25 má pred nimi 4 B pľuzgierov na gumách)
+            parts = o + (28 if fmt >= 2025 else 24)
+            if parts + 6 <= len(data):
+                f.damage = float(max(data[parts:parts + 6]))
+        elif pid == PKT_MOTION_EX:
+            self._motion_ex(data, off)
+        elif pid == PKT_EVENT:
+            self._event(data, off, player)
 
     def _telemetry(self, data, o):
         (speed, throttle, steer, brake, clutch, gear, rpm, drs, _revpct, _revbits,
@@ -92,6 +111,31 @@ class F1Source(UdpSource):
         f.tyre_temp = _fl(surface)
         f.tyre_pressure = _fl(pressure)
         f.water_temp = float(_engine_temp)
+        ground = rest[17:21]
+        if ground:
+            f.fx_kerb = min(1.0, sum(1 for s in ground if s in KERB_SURFACES) / 2)
+            f.fx_rough = min(1.0, sum(1 for s in ground if s in ROUGH_SURFACES) / 2)
+
+    def _motion_ex(self, data, o):
+        """Len hráčovo auto: rýchlosť kolies (m/s) a uhly sklzu, poradie RL RR FL FR."""
+        if o + 96 > len(data):
+            return
+        v = struct.unpack_from("<24f", data, o)
+        f = self.frame
+        wheel_fx(f, [v[12 + i] for i in ORDER])
+        angle = [abs(v[20 + i]) for i in ORDER]
+        f.balance = None
+        balance_from(f, (angle[0] + angle[1]) / 2, (angle[2] + angle[3]) / 2)
+
+    def _event(self, data, o, player):
+        code = data[o:o + 4]
+        if code == b"PENA" and o + 11 <= len(data):
+            ptype, _inf, car, _other, secs = data[o + 4:o + 9]
+            if car == player and ptype in F1_PENALTY:
+                f = self.frame
+                kind = F1_PENALTY[ptype]
+                f.penalty = f"time:{secs}" if kind == "time" else kind
+                f.penalty_n += 1
 
     def _participants(self, data, o, fmt):
         # F1 25: 57 B na auto, meno 32 znakov; F1 23/24: meno 48 znakov. Meno je vždy od 7. bajtu.
@@ -153,6 +197,8 @@ class F1Source(UdpSource):
         compound = {16: "C5", 17: "C4", 18: "C3", 19: "C2", 20: "C1", 21: "C0", 22: "C6", 7: "Inter",
                     8: "Wet"}
         f.tyre_compound = compound.get(v[13], "")
+        if v[13] in compound:
+            f.wet_tyres = v[13] in (7, 8)
 
     def _motion(self, data, o):
         v = MOTION.unpack_from(data, o)
@@ -169,3 +215,23 @@ class F1Source(UdpSource):
         f.track_length = float(track_len)
         f.track = TRACKS.get(track_id, f"Trať {track_id}")
         f.car = TEAMS_FORMULA.get(formula, "F1")
+        f.rain = F1_RAIN.get(_weather)
+        # safety car (bajt 125) a predpoveď počasia (od bajtu 128, 8 B na vzorku)
+        if len(data) > o + 128:
+            f.safety_car = {1: "SC", 2: "VSC"}.get(data[o + 125], "")
+            n = data[o + 127]
+            r10 = r30 = None
+            for i in range(min(n, 64)):
+                p = o + 128 + i * 8
+                if p + 8 > len(data):
+                    break
+                stype, offset, weather = data[p], data[p + 1], data[p + 2]
+                if stype != _stype or offset == 0:
+                    continue
+                rain = F1_RAIN.get(weather, 0)
+                if offset <= 10:
+                    r10 = max(r10 or 0, rain)
+                elif offset <= 30:
+                    r30 = max(r30 or 0, rain)
+            f.rain_10 = r10
+            f.rain_30 = r30 if r30 is not None else r10

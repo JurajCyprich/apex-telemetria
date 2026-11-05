@@ -3,7 +3,7 @@ import asyncio
 import ctypes
 import time
 
-from ..model import Frame
+from ..model import Frame, balance_from, wheel_fx
 from ..winapi import SharedMemory, running_processes
 from .base import Source
 
@@ -34,6 +34,15 @@ class Physics(ctypes.Structure):
         ("clutch", F), ("tyreTempI", F4), ("tyreTempM", F4), ("tyreTempO", F4),
         ("isAIControlled", I), ("tyreContactPoint", F3 * 4), ("tyreContactNormal", F3 * 4),
         ("tyreContactHeading", F3 * 4), ("brakeBias", F), ("localVelocity", F3),
+        # AC 1.7+ a ACC (staršie verzie tu majú nuly)
+        ("P2PActivations", I), ("P2PStatus", I), ("currentMaxRpm", I), ("mz", F4), ("fx", F4),
+        ("fy", F4), ("slipRatio", F4), ("slipAngle", F4), ("tcinAction", I), ("absInAction", I),
+        ("suspensionDamage", F4), ("tyreTemp", F4),
+        # len ACC
+        ("waterTemp", F), ("brakePressure", F4), ("frontBrakeCompound", I), ("rearBrakeCompound", I),
+        ("padLife", F4), ("discLife", F4), ("ignitionOn", I), ("starterEngineOn", I),
+        ("isEngineRunning", I), ("kerbVibration", F), ("slipVibrations", F), ("gVibrations", F),
+        ("absVibrations", F),
     ]
 
 
@@ -98,6 +107,10 @@ class Static(ctypes.Structure):
 AC_OFF, AC_REPLAY, AC_LIVE, AC_PAUSE = 0, 1, 2, 3
 ACC_FLAGS = {1: "blue", 2: "yellow", 3: "black", 4: "white", 5: "checkered", 6: "penalty",
              7: "green", 8: "orange"}
+# ACC_PENALTY_TYPE -> druh trestu
+ACC_PENALTY = {1: "drive", 7: "drive", 19: "drive", 2: "stopgo", 3: "stopgo", 4: "stopgo", 8: "stopgo",
+               9: "stopgo", 10: "stopgo", 6: "bestlap", 12: "bestlap", 14: "time"}
+ACC_DSQ = {5, 11, 13, 15, 16, 17, 18, 20, 21}
 
 
 def _wheels(arr, fn=lambda v: v):
@@ -121,6 +134,9 @@ class AssettoSource(Source):
         self._static_at = 0.0
         self._last_packet = None
         self._last_change = 0.0
+        self._susp = None       # (čas, zdvih tlmičov) – obrubníky v AC podľa rýchlosti tlmičov
+        self._penalty = 0
+        self._penalty_n = 0
 
     def _detect_variant(self):
         procs = running_processes()
@@ -214,6 +230,7 @@ class AssettoSource(Source):
         if p.brakeBias:
             f.brake_bias = round(p.brakeBias * 100, 1)
         f.flag = ACC_FLAGS.get(g.flag, "")
+        self._feel(f, p, s)
 
         if self.is_acc:
             idx = 0
@@ -229,9 +246,42 @@ class AssettoSource(Source):
             # odstupy v ms; 0 = nie je auto pred / za tebou alebo staršia verzia ACC
             f.gap_ahead = g.gapAhead / 1000 if 0 < g.gapAhead < 3_600_000 else None
             f.gap_behind = g.gapBehind / 1000 if 0 < g.gapBehind < 3_600_000 else None
+            # počasie: 0 sucho … 5 búrka (rovnaká stupnica ako ACC)
+            if 0 <= g.rainIntensity <= 5:
+                f.rain, f.rain_10, f.rain_30 = g.rainIntensity, g.rainIntensityIn10min, g.rainIntensityIn30min
+            f.wet_tyres = bool(g.rainTyres)
+            if g.penalty != self._penalty:
+                self._penalty = g.penalty
+                if g.penalty:
+                    self._penalty_n += 1
+            if g.penalty:
+                f.penalty = "dsq" if g.penalty in ACC_DSQ else ACC_PENALTY.get(g.penalty, "other")
+            f.penalty_n = self._penalty_n
         else:
             f.pos_x, f.pos_z = g.carCoordinates[0], g.carCoordinates[2]
             # v AC sú tc/abs úrovne asistentov (0 = vypnuté)
             f.tc = round(p.tc, 2) if p.tc else None
             f.abs = round(p.abs, 2) if p.abs else None
         return f
+
+    def _feel(self, f, p, s):
+        """Čo cíti auto: zablokované / pretáčajúce kolesá, ABS, obrubníky, vyváženie v zákrute."""
+        radius = [float(r) for r in s.tyreRadius]
+        if any(radius):
+            r0 = max(radius)
+            wheel_fx(f, [p.wheelAngularSpeed[i] * (radius[i] or r0) for i in range(4)])
+        f.fx_abs = 1.0 if p.absInAction else 0.0
+        sa = [abs(float(x)) for x in p.slipAngle]
+        if any(sa):
+            balance_from(f, (sa[0] + sa[1]) / 2, (sa[2] + sa[3]) / 2)
+        if self.is_acc:
+            f.fx_kerb = round(min(1.0, max(0.0, p.kerbVibration) * 1.2), 2)
+        else:
+            # AC obrubníky neposiela – spoznáme ich podľa rýchlych pohybov tlmičov
+            now = time.monotonic()
+            travel = [float(x) for x in p.suspensionTravel]
+            if self._susp and 0.005 < now - self._susp[0] < 0.2 and any(travel):
+                dt = now - self._susp[0]
+                vel = max(abs(a - b) for a, b in zip(travel, self._susp[1])) / dt
+                f.fx_kerb = round(min(1.0, max(0.0, vel - 0.25) / 0.5), 2)
+            self._susp = (now, travel)

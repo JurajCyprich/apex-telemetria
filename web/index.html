@@ -26,6 +26,7 @@
   </nav>
   <div class="status"><span class="dot" id="dot"></span><span id="status">Čakám na hru…</span></div>
   <button class="btn" id="recBtn" title="Nahrávanie obrazu kôl pre street view">🎥 Obraz</button>
+  <button class="btn" id="trBtn" title="Tréning jednej zákruty – meria len ju pri každom prejazde">🎯 Zákruta</button>
   <button class="btn" id="engBtn">🔈 Inžinier</button>
   <button class="btn" id="phoneBtn">📱 Mobil</button>
   <button class="btn" id="settingsBtn">⚙ Nastavenia</button>
@@ -205,6 +206,31 @@
   </div>
 </div>
 
+<div class="modal-bg" id="trModal">
+  <div class="modal">
+    <h2>🎯 Tréning zákruty</h2>
+    <p class="muted">Vyber zákrutu, ktorá ti nejde. Pri každom prejazde sa zmeria len ona – čas úseku, kde si brzdil,
+      najnižšia rýchlosť a výjazd. Inžinier (ak je zapnutý) po každom prejazde povie, či to bolo lepšie.</p>
+    <div class="tr-list" id="trList"></div>
+    <div class="actions"><span style="flex:1"></span><button class="btn" data-close>Zavrieť</button></div>
+  </div>
+</div>
+
+<aside class="tr-panel card" id="trPanel" hidden>
+  <div class="tr-head"><b id="trTitle">🎯 Zákruta</b><span style="flex:1"></span>
+    <button class="btn small" id="trOther">Iná</button><button class="btn small" id="trStop">✕ Koniec</button></div>
+  <div class="tr-stats">
+    <div><small>Posledný prejazd</small><b class="mono" id="trLast">–</b></div>
+    <div><small>Najlepší dnes</small><b class="mono" id="trBest">–</b></div>
+    <div><small>Z uložených kôl</small><b class="mono" id="trSaved">–</b></div>
+  </div>
+  <p class="muted small" id="trGoal"></p>
+  <table class="tr-table">
+    <thead><tr><th>#</th><th>Čas</th><th title="Oproti najlepšiemu brzdeniu z uložených kôl (+ = neskôr)">Brzdenie</th><th>Min km/h</th><th>Výjazd</th></tr></thead>
+    <tbody id="trRows"></tbody>
+  </table>
+</aside>
+
 <div class="modal-bg" id="recModal">
   <div class="modal">
     <h2>🎥 Nahrávanie obrazu kôl</h2>
@@ -242,6 +268,14 @@
     </div>
     <p class="warn small" id="engNoLocal" hidden>Slovenský ani český hlas nie je nainštalovaný – hlásenia budú znieť cudzím prízvukom.
       Pridáš ho vo Windows: Nastavenia → Čas a jazyk → Reč → Spravovať hlasy → Pridať hlasy → Slovenčina. Potom reštartuj aplikáciu.</p>
+    <div class="field"><label>Kde hovoriť</label>
+      <select id="engOut">
+        <option value="pc">Z reproduktorov PC</option>
+        <option value="phone">Z mobilu – volant (slúchadlá, AirPods)</option>
+        <option value="both">PC aj mobil</option>
+      </select>
+      <p class="muted small">Mobil musí mať otvorený volant (appka Apex Volant alebo stránka volantu, po ▶ Štart).</p>
+    </div>
     <div class="cols">
       <div class="field"><label>Hlasitosť</label><input type="range" id="engVolume" min="0.1" max="1" step="0.05"></div>
       <div class="field"><label>Rýchlosť reči</label><input type="range" id="engRate" min="0.7" max="1.6" step="0.05"></div>
@@ -249,7 +283,7 @@
     <h3 class="sub">Čo hlásiť</h3>
     <label class="check"><input type="checkbox" id="eng_laps"> Čas kola a rozdiel oproti najlepšiemu kolu</label>
     <label class="check"><input type="checkbox" id="eng_fuel"> Palivo (keď zostáva menej ako 3 kolá)</label>
-    <label class="check"><input type="checkbox" id="eng_flags"> Vlajky</label>
+    <label class="check"><input type="checkbox" id="eng_flags"> Vlajky, safety car, tresty a poškodenie</label>
     <label class="check"><input type="checkbox" id="eng_pit"> Pit limiter v boxovej uličke</label>
     <label class="check"><input type="checkbox" id="eng_corners"> Rýchlosť pred zákrutou (z tvojho najlepšieho kola s týmto autom)</label>
     <div class="cols">
@@ -260,7 +294,9 @@
     <label class="check"><input type="checkbox" id="eng_coach"> Hodnotenie po zákrute – strata alebo zisk oproti najlepšiemu kolu a prečo</label>
     <div class="field"><label>Hodnotiť, až keď je rozdiel aspoň</label>
       <select id="engCoachMin"><option value="0.05">0,05 s</option><option value="0.1">0,1 s</option><option value="0.2">0,2 s</option><option value="0.3">0,3 s</option></select></div>
-    <label class="check"><input type="checkbox" id="eng_gaps"> Odstupy od súperov po každom kole (F1, ACC, RaceRoom)</label>
+    <label class="check"><input type="checkbox" id="eng_gaps"> Odstupy od súperov po každom kole a či ich dobiehaš (F1, ACC, RaceRoom)</label>
+    <label class="check"><input type="checkbox" id="eng_race"> Preteky – zmena pozície, súper do sekundy pred tebou / za tebou</label>
+    <label class="check"><input type="checkbox" id="eng_weather"> Počasie – príde dážď, kedy prezuť na dažďové / suché gumy (ACC, F1)</label>
     <label class="check"><input type="checkbox" id="eng_strategy"> Stratégia – kedy do boxov, či vystačí palivo (nastavíš v 🏁 pri palive)</label>
     <label class="check"><input type="checkbox" id="eng_tyres"> Pneumatiky a brzdy – studené, prehriate gumy, zlý tlak, prehriate brzdy</label>
     <div class="cols">
@@ -283,6 +319,7 @@
 <script src="/static/common.js"></script>
 <script src="/static/strategy.js"></script>
 <script src="/static/engineer.js"></script>
+<script src="/static/training.js"></script>
 <script src="/static/dashboard.js"></script>
 </body>
 </html>

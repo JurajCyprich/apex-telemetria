@@ -4,7 +4,7 @@ import ctypes
 import math
 import time
 
-from ..model import Frame
+from ..model import Frame, wheel_fx
 from ..winapi import SharedMemory
 from .base import Source
 
@@ -261,4 +261,17 @@ class RaceRoomSource(Source):
             f.flag = "yellow"
         elif d.flags.green == 1:
             f.flag = "green"
+
+        # kolesá: obvodová rýchlosť (m/s), povrch pod kolesom (5 obrubník, 2-4 tráva / hlina / štrk), ABS
+        speeds = list(d.tire_speed)
+        if all(v > -1 for v in speeds):
+            wheel_fx(f, speeds)
+        ground = list(d.tire_on_mtrl)
+        f.fx_kerb = min(1.0, sum(1 for m in ground if m == 5) / 2)
+        f.fx_rough = min(1.0, sum(1 for m in ground if m in (2, 3, 4)) / 2)
+        f.fx_abs = 1.0 if d.aid_settings.abs == 5 else 0.0
+        pen = d.penalties
+        f.penalty = ("drive" if pen.drive_through > 0 else "stopgo" if pen.stop_and_go > 0
+                     else "time" if pen.time_deduction > 0 else "slowdown" if pen.slow_down > 0 else "")
+        f.penalty_n = d.num_penalties if d.num_penalties > 0 else 0
         return f

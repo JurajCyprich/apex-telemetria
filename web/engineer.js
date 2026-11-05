@@ -5,8 +5,10 @@ const engineer = (() => {
   const DEFAULTS = { on: false, voice: "", lang: "auto", volume: 1, rate: 1.05,
     laps: true, fuel: true, flags: true, pit: true, corners: true, cornerLead: 3, cornerNum: true,
     coach: true, coachMin: 0.1, gaps: true,
-    strategy: true, tyres: true, tyreLo: 75, tyreHi: 100, pressLo: 0, pressHi: 0, brakeHot: 800 };
-  const CHECKS = ["laps", "fuel", "flags", "pit", "corners", "cornerNum", "coach", "gaps", "strategy", "tyres"];
+    strategy: true, tyres: true, tyreLo: 75, tyreHi: 100, pressLo: 0, pressHi: 0, brakeHot: 800,
+    race: true, weather: true, out: "pc" };
+  const CHECKS = ["laps", "fuel", "flags", "pit", "corners", "cornerNum", "coach", "gaps", "strategy", "tyres",
+    "race", "weather"];
   const NUMS = { engTyreLo: "tyreLo", engTyreHi: "tyreHi", engPressLo: "pressLo", engPressHi: "pressHi", engBrakeHot: "brakeHot" };
   const cfg = { ...DEFAULTS };
   try { Object.assign(cfg, JSON.parse(localStorage.getItem("engineer") || "{}")); } catch { /* bez úložiska */ }
@@ -71,6 +73,27 @@ const engineer = (() => {
       tyreLaps: (n) => `Gumy vydržia ešte ${n} ${n === 1 ? "kolo" : n <= 4 ? "kolá" : "kôl"}.`,
       num: (v, n = 1) => v.toFixed(n).replace(".", ","),
       test: "Rádio funguje.",
+      ahead: (g) => `Pred tebou ${g}`,
+      behind: (g) => `za tebou ${g}`,
+      catching: (g) => `dobiehaš ${g} za kolo`,
+      pulling: (g) => `uteká ti o ${g} za kolo`,
+      closing: (g) => `približuje sa o ${g} za kolo`,
+      dropping: (g) => `vzďaľuje sa o ${g} za kolo`,
+      closeAhead: "Si do sekundy za autom pred tebou.",
+      closeBehind: "Auto za tebou je do sekundy, bráň sa.",
+      position: (p) => `Pozícia ${p}.`,
+      sc: "Safety car na trati.",
+      vsc: "Virtuálny safety car.",
+      scEnd: "Safety car končí, priprav sa.",
+      penalty: { drive: "Trest: prejazd boxovou uličkou.", stopgo: "Trest: stop and go.", time: (s) => `Trest ${s} sekúnd.`,
+        warning: "Varovanie za skracovanie trate.", lap: "Kolo je neplatné.", dsq: "Diskvalifikácia.",
+        grid: "Trest na štartovom rošte.", black: "Čierna vlajka.", bestlap: "Zrušili ti najlepšie kolo.",
+        slowdown: "Spomaľ, musíš vrátiť pozíciu.", other: "Dostal si trest." },
+      damage: (p) => `Máš poškodenie, ${p} percent.`,
+      rainSoon: "Do desiatich minút začne pršať.",
+      rainLater: "Do pol hodiny príde dážď.",
+      wetNow: "Prší, zváž dažďové gumy.",
+      dryNow: "Trať schne, zváž suché gumy.",
     },
     en: {
       time(s) {  // "1 23 point 7" -> "one twenty-three point seven"
@@ -114,6 +137,27 @@ const engineer = (() => {
       tyreLaps: (n) => `Tyres good for ${n} more ${n === 1 ? "lap" : "laps"}.`,
       num: (v, n = 1) => v.toFixed(n),
       test: "Radio check.",
+      ahead: (g) => `Gap ahead ${g}`,
+      behind: (g) => `behind ${g}`,
+      catching: (g) => `catching ${g} a lap`,
+      pulling: (g) => `he is pulling away ${g} a lap`,
+      closing: (g) => `closing ${g} a lap`,
+      dropping: (g) => `dropping back ${g} a lap`,
+      closeAhead: "You are within a second of the car ahead.",
+      closeBehind: "Car behind within a second, defend.",
+      position: (p) => `P${p}.`,
+      sc: "Safety car deployed.",
+      vsc: "Virtual safety car.",
+      scEnd: "Safety car ending, get ready.",
+      penalty: { drive: "Penalty: drive through.", stopgo: "Penalty: stop and go.", time: (s) => `${s} second penalty.`,
+        warning: "Track limits warning.", lap: "Lap invalidated.", dsq: "Disqualified.", grid: "Grid penalty.",
+        black: "Black flag.", bestlap: "Best lap deleted.", slowdown: "Slow down, give the position back.",
+        other: "You have a penalty." },
+      damage: (p) => `You have damage, ${p} percent.`,
+      rainSoon: "Rain expected within ten minutes.",
+      rainLater: "Rain expected within half an hour.",
+      wetNow: "It is raining, consider wet tyres.",
+      dryNow: "Track is drying, consider slicks.",
     },
   };
   function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
@@ -135,11 +179,14 @@ const engineer = (() => {
   addEventListener("keydown", unlock, { once: true });
 
   const lastSaid = {};
+  let sender = null;  // posielanie hlásení do volantu na mobile (dashboard nastaví cez setSender)
   function say(text, key, minGapMs = 0, force = false, urgent = false) {
-    if (!supported || (!cfg.on && !force)) return;
+    if (!cfg.on && !force) return;
     const now = Date.now();
     if (key && now - (lastSaid[key] || 0) < minGapMs) return;
     if (key) lastSaid[key] = now;
+    if (cfg.out !== "pc" && sender) sender({ type: "say", text, lang: lang(), urgent, rate: cfg.rate });
+    if (cfg.out === "phone" || !supported) return;
     // staré hlásenia už nie sú aktuálne; naliehavé (zákruta pred tebou) preruší aj práve hovorené
     if (urgent ? speechSynthesis.speaking || speechSynthesis.pending : speechSynthesis.pending) speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
@@ -160,6 +207,11 @@ const engineer = (() => {
   let tyreAcc = { n: 0, temp: [0, 0, 0, 0], press: [0, 0, 0, 0], pn: 0 };
   let coldSince = 0, brakeSince = 0;
   let fuelOkSaid = false;
+  // preteky: pozícia, odstupy, safety car, tresty, poškodenie, počasie
+  let pos = { shown: 0, cand: 0, since: 0 };
+  let penaltyN = null, damageSaid = null, scShown = null;
+  let prevGaps = null;  // odstupy na konci minulého kola (pre trend)
+  let wetSince = 0, drySince = 0;
 
   function frame(d) {
     if (!d.connected) {
@@ -221,6 +273,8 @@ const engineer = (() => {
       } else brakeSince = 0;
     }
 
+    race(d, now);
+
     // v boxovej uličke bez pit limitera
     if (d.in_pit && !d.pit_limiter && d.speed > 30) {
       if (!pitSince) pitSince = now;
@@ -229,6 +283,79 @@ const engineer = (() => {
       pitSince = 0;
     }
     last = d;
+  }
+
+  function race(d, now) {
+    const tx = t();
+    // safety car / virtuálny safety car
+    const sc = d.safety_car || "";
+    if (scShown === null) scShown = sc;
+    if (sc !== scShown) {
+      if (cfg.flags) say(sc === "SC" ? tx.sc : sc === "VSC" ? tx.vsc : tx.scEnd, `sc-${sc}`, 10000);
+      scShown = sc;
+    }
+    // trest – hra zvýši počítadlo pri každom novom treste
+    const pn = d.penalty_n || 0;
+    if (penaltyN === null) penaltyN = pn;
+    if (pn > penaltyN && d.penalty && cfg.flags) {
+      const [kind, secs] = d.penalty.split(":");
+      const p = tx.penalty[kind] || tx.penalty.other;
+      say(typeof p === "function" ? p(secs || "") : p, null, 0, false, true);
+    }
+    penaltyN = pn;
+    // poškodenie – hlásime nárast o 10 percentných bodov
+    if (typeof d.damage === "number") {
+      if (damageSaid === null || d.damage < damageSaid - 5) damageSaid = d.damage;  // oprava v boxoch
+      if (d.damage >= damageSaid + 10) {
+        damageSaid = d.damage;
+        if (cfg.flags) say(tx.damage(Math.round(d.damage)), "damage", 5000);
+      }
+    }
+    // pozícia – len v pretekoch, zmena musí vydržať 3 s (predbiehanie sa môže hneď vrátiť)
+    const racing = d.total_laps > 0 || !!d.standings;
+    if (racing && d.position > 0) {
+      if (d.position !== pos.cand) pos = { ...pos, cand: d.position, since: now };
+      if (!pos.shown) pos.shown = d.position;
+      if (pos.cand !== pos.shown && now - pos.since > 3000) {
+        if (cfg.race && (d.lap || 0) >= 1) say(tx.position(pos.cand), "position", 4000);
+        pos.shown = pos.cand;
+      }
+    }
+    // súper do sekundy
+    if (cfg.race && racing) {
+      if (d.gap_behind && d.gap_behind < 1 && last.gap_behind >= 1) say(tx.closeBehind, "close-behind", 90000);
+      if (d.gap_ahead && d.gap_ahead < 1 && last.gap_ahead >= 1) say(tx.closeAhead, "close-ahead", 90000);
+    }
+    // počasie (ACC, F1): predpoveď dažďa a kedy prezuť
+    if (cfg.weather && d.rain !== null && d.rain !== undefined) {
+      const dryTyres = d.wet_tyres === false;
+      if (d.rain < 2 && !d.wet_tyres) {
+        if (d.rain_10 >= 2) say(tx.rainSoon, "rain-soon", 300000);
+        else if (d.rain_30 >= 2) say(tx.rainLater, "rain-later", 600000);
+      }
+      if (d.rain >= 3 && dryTyres && d.speed > 30) {
+        if (!wetSince) wetSince = now;
+        if (now - wetSince > 20000) say(tx.wetNow, "wet-now", 120000);
+      } else wetSince = 0;
+      if (d.wet_tyres && d.rain <= 1 && (d.rain_10 ?? 0) <= 1 && d.speed > 30) {
+        if (!drySince) drySince = now;
+        if (now - drySince > 60000) say(tx.dryNow, "dry-now", 180000);
+      } else drySince = 0;
+    }
+  }
+
+  // odstupy po kole + trend (dobiehaš / uteká), trend len ak je pred / za tebou stále to isté miesto
+  function gapsText(d, prev, tx = t()) {
+    const parts = [];
+    const same = prev && prev.pos === d.position;
+    const trend = (now, before, minus, plus) => {
+      if (!same || !now || !before) return "";
+      const diff = now - before;
+      return Math.abs(diff) >= 0.1 ? `, ${(diff < 0 ? minus : plus)(tx.gap(Math.abs(diff)))}` : "";
+    };
+    if (d.gap_ahead) parts.push(tx.ahead(tx.gap(d.gap_ahead)) + trend(d.gap_ahead, prev?.a, tx.catching, tx.pulling));
+    if (d.gap_behind) parts.push(tx.behind(tx.gap(d.gap_behind)) + trend(d.gap_behind, prev?.b, tx.closing, tx.dropping));
+    return parts.length ? `${parts.map(cap).join(". ")}.` : null;
   }
 
   function lapText(time, ref, tx = t()) {
@@ -316,9 +443,10 @@ const engineer = (() => {
     // palivo – údaje o spotrebe prídu s ďalším snímkom, preto chvíľu počkáme
     setTimeout(() => {
       if (cfg.gaps && (last.gap_ahead || last.gap_behind)) {
-        const g = (x) => (x ? t().gap(x) : "");
-        say(t().gaps(g(last.gap_ahead), g(last.gap_behind)));
+        const text = gapsText(last, prevGaps);
+        if (text) say(text);
       }
+      prevGaps = { a: last.gap_ahead, b: last.gap_behind, pos: last.position };
       if (cfg.tyres) tyreText(tyreAcc).forEach((s) => say(s));
       tyreAcc = { n: 0, temp: [0, 0, 0, 0], press: [0, 0, 0, 0], pn: 0 };
       const st = cfg.strategy ? strategyText(last) : null;
@@ -359,6 +487,7 @@ const engineer = (() => {
       $("engNoLocal").hidden = !!localVoice() || !voices.length || lang() !== "sk";
       $("engOn").checked = cfg.on;
       $("engLang").value = cfg.lang;
+      $("engOut").value = cfg.out;
       for (const k of CHECKS) $(`eng_${k}`).checked = cfg[k];
       for (const [id, k] of Object.entries(NUMS)) $(id).value = cfg[k];
       $("engVolume").value = cfg.volume;
@@ -375,6 +504,7 @@ const engineer = (() => {
     $("engOn").addEventListener("change", (e) => { cfg.on = e.target.checked; save(); syncBtn(); });
     $("engVoice").addEventListener("change", (e) => { cfg.voice = e.target.value; save(); fill(); });
     $("engLang").addEventListener("change", (e) => { cfg.lang = e.target.value; save(); fill(); });
+    $("engOut").addEventListener("change", (e) => { cfg.out = e.target.value; save(); });
     $("engVolume").addEventListener("input", (e) => { cfg.volume = +e.target.value; save(); });
     $("engRate").addEventListener("input", (e) => { cfg.rate = +e.target.value; save(); });
     $("engLead").addEventListener("change", (e) => { cfg.cornerLead = +e.target.value; save(); });
@@ -391,5 +521,7 @@ const engineer = (() => {
     });
   }
 
-  return { frame, lap, corner, coachText, tyreText, strategyText, say, setupUI, lapText, lang, T, cfg };
+  const setSender = (fn) => { sender = fn; };
+  return { frame, lap, corner, coachText, tyreText, strategyText, gapsText, say, setupUI, lapText, lang, T, cfg,
+    setSender };
 })();

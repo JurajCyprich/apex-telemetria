@@ -97,5 +97,13 @@ class DemoSource(Source):
             f.tyre_compound = "DHE"
             f.tc, f.tc2, f.abs, f.engine_map, f.brake_bias = tc, 2, abs_, emap, bb
             f.water_temp, f.air_temp, f.track_temp = 88.0, 22.0, 31.0
+            # správanie auta pre vibrácie a rady k nastaveniu: pri brzdení nedotáča, na plyne pretáča
+            if abs(f.g_lat) > 0.5:
+                f.balance = 0.32 if brk > 0 else (-0.18 if thr >= 1 else 0.05)
+                f.fx_kerb = 0.6 if abs(f.g_lat) > 1.4 else 0.0
+            if brk > 0.6 and lap % 2 == 0:
+                f.fx_lock, f.lock_axle = 0.6, 1
+            if thr >= 1 and abs(f.g_lat) > 0.8:
+                f.fx_spin = 0.4
             self.emit(f)
             await asyncio.sleep(1 / 60)

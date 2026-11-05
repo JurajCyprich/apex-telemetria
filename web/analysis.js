@@ -94,6 +94,35 @@ function draw() {
 
 // ---------- teoretické najlepšie kolo, najlepšie brzdné body, najrýchlejšia stopa ----------
 let theo = { key: null, data: null };
+// rady k nastaveniu: kde auto nedotáča / pretáča, kde blokujú a pretáčajú sa kolesá
+function drawSetup(s) {
+  const card = $("setupCard");
+  card.hidden = !s;
+  if (!s) return;
+  $("setupHint").textContent = (s.laps === 1 ? "· z posledného kola" : `· z posledných ${s.laps} kôl`)
+    + " · orientačné rady – meň vždy len jednu vec a skús pár kôl";
+  $("setupTips").innerHTML = s.tips.length
+    ? s.tips.map((tip) => `<div class="tip"><b>${tip.title}</b>
+        <span class="muted">· ${tip.corners.length > 1 ? "zákruty" : "zákruta"} ${tip.corners.join(", ")}</span>
+        <ul>${tip.tips.map((x) => `<li>${x}</li>`).join("")}</ul></div>`).join("")
+    : `<p class="ok">Auto je v zákrutách vyvážené, kolesá neblokujú ani sa nepretáčajú. 👍</p>`;
+  const bal = (v) => {
+    if (v === null || v === undefined) return "–";
+    if (v > 0.2) return `<span class="under">${v > 0.4 ? "výrazne " : ""}nedotáča</span>`;
+    if (v < -0.1) return `<span class="over">${v < -0.25 ? "výrazne " : ""}pretáča</span>`;
+    return `<span class="okc">✓</span>`;
+  };
+  const axle = (a) => ({ 1: "predné", 2: "zadné", 3: "predné aj zadné" })[a] || "";
+  const pct = (v, extra = "") => (v >= 0.3 ? `<span class="over">${Math.round(v * 100)} % kôl ${extra}</span>`
+    : v > 0 ? `${Math.round(v * 100)} %` : "–");
+  const head = s.balance ? "<th>Vjazd</th><th>Stred</th><th>Výjazd</th>" : "";
+  const rows = s.corners.map((c) => `<tr><td>${c.n}</td>${s.balance ? `<td>${bal(c.entry)}</td><td>${bal(c.mid)}</td><td>${bal(c.exit)}</td>` : ""}
+    <td>${pct(c.lock, axle(c.lock_axle))}</td><td>${pct(c.spin)}</td></tr>`).join("");
+  $("setupTable").innerHTML = `<table class="ctab stab"><tr><th style="text-align:left">Zákruta</th>${head}
+    <th>Blokujú kolesá</th><th>Pretáčajú sa kolesá</th></tr>${rows}</table>`
+    + (s.balance ? "" : `<p class="muted small">Táto hra neposiela uhly sklzu kolies – nedotáčavosť a pretáčavosť nevieme posúdiť.</p>`);
+}
+
 async function drawTheo() {
   const card = $("theoCard");
   if (!lapA) { card.hidden = true; theo = { key: null, data: null }; return; }
@@ -108,6 +137,7 @@ async function drawTheo() {
     drawMap();
   }
   const t = theo.data;
+  drawSetup(t && t.setup);
   $("streetLink").hidden = !lapA.channels || !laps.find((l) => l.id === lapA.id)?.video;
   $("streetLink").href = `/street?a=${lapA.id}${lapB ? `&b=${lapB.id}` : ""}`;
   card.hidden = !t;
